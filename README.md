@@ -23,6 +23,17 @@ abrir archivos `.md` fuera de cualquier editor de IA o de código.
   de la app.
 - Abre también archivos `.txt`, con la opción de convertirlos a `.md`.
 
+## Capturas
+
+| | |
+| --- | --- |
+| ![Lectura en tema noche, con un diagrama Mermaid](docs/screenshots/01-lectura-oscuro-mermaid.png) | ![Botón Copiar confirmado en un bloque de código](docs/screenshots/02-copiar-codigo.png) |
+| Lectura en tema noche, con pestañas y un diagrama Mermaid | Botón **Copiar** confirmado en un bloque de código |
+| ![Lectura en tema día](docs/screenshots/03-lectura-claro.png) | ![Edición con vista dividida](docs/screenshots/04-edicion-dividida.png) |
+| Lectura en tema día | Edición con vista dividida |
+
+Los documentos de las capturas están en [`examples/`](examples).
+
 ## Instalación
 
 ### Uso portable (sin instalar nada)
