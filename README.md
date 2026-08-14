@@ -6,6 +6,8 @@ Visor y editor de Markdown para Windows. Un único ejecutable de ~14 MB, sin
 conexión a internet, que se puede fijar como programa predeterminado para
 abrir archivos `.md` fuera de cualquier editor de IA o de código.
 
+**[Descargar VisorMD-portable.zip](../../releases/latest/download/VisorMD-portable.zip)**
+
 ## Qué hace
 
 - **Lectura**: el documento renderizado con formato completo — tablas,
@@ -25,7 +27,7 @@ abrir archivos `.md` fuera de cualquier editor de IA o de código.
 
 ### Uso portable (sin instalar nada)
 
-1. Descargar `VisorMD-portable.zip` desde [Releases](../../releases).
+1. Descargar [`VisorMD-portable.zip`](../../releases/latest/download/VisorMD-portable.zip).
 2. Descomprimirlo en cualquier carpeta.
 3. Ejecutar `VisorMD.exe`. Se puede mover esa carpeta a un pendrive o a otra
    PC sin perder nada: los ajustes se guardan aparte, en el perfil de
@@ -106,9 +108,6 @@ igual que en GitHub.
 
 ## Detalles técnicos
 
-Documentado para quien quiera revisar decisiones de diseño, no solo usar la
-app.
-
 ### Arquitectura
 
 | Archivo | Contenido |
@@ -134,10 +133,9 @@ forma diferida, solo cuando el documento contiene un diagrama.
 
 ### Pestañas y ventanas
 
-Todas las ventanas de una misma sesión viven en **un solo proceso**: abrir
-una ventana nueva es instantáneo, comparten los ajustes en memoria (el tema
-no puede quedar desincronizado entre ellas) y mover una pestaña de una
-ventana a otra no requiere comunicación entre procesos.
+Todas las ventanas de una misma sesión viven en un solo proceso: abrir una
+ventana nueva es instantáneo, comparten los ajustes en memoria y mover una
+pestaña de una ventana a otra no requiere comunicación entre procesos.
 
 Cada pestaña es un documento independiente (`Doc` en `main.py`) con su ruta,
 codificación, fin de línea y estado de cambios sin guardar. La interfaz
@@ -145,27 +143,18 @@ mantiene un único `<textarea>` y un único panel de vista previa: cambiar de
 pestaña vuelca el texto en memoria y vuelve a renderizar, en vez de sostener
 varios pares editor/vista ocultos.
 
-El arrastre de pestañas usa eventos de puntero, no el `dragstart`/`drop` de
-HTML5 (que marcaba con el cursor de prohibido casi cualquier destino,
-obligaba a soltar fuera de la ventana y filtraba el identificador interno de
-la pestaña al portapapeles de otras aplicaciones). Al soltar, Python
-consulta con `WindowFromPoint` qué ventana de la aplicación hay bajo el
-cursor: si hay una, el `Doc` se muda entero, con su texto sin guardar; si no
-hay ninguna, se abre una ventana nueva en ese punto.
+El arrastre de pestañas usa eventos de puntero en vez del arrastrar y
+soltar nativo de HTML5, que no ofrece control fino sobre soltar una pestaña
+fuera de la ventana o sobre otra ventana de la misma app. Al soltar, se
+identifica qué ventana propia hay bajo el cursor: si hay una, la pestaña se
+muda con su texto sin guardar; si no hay ninguna, se abre una ventana nueva
+en ese punto.
 
-Al abrir un archivo, la aplicación intenta enlazar un puerto TCP fijo en
-`127.0.0.1` (derivado del nombre de usuario). Si lo consigue, es la
-instancia principal: ese mismo enlace hace de mutex y de canal para recibir
-rutas de instancias posteriores, que se agregan como pestaña nueva en la
-última ventana enfocada. Si el puerto ya está tomado, la instancia nueva le
-reenvía su ruta por ese socket y termina sin abrir ventana propia.
-`--new-window` evita este mecanismo.
+Abrir un archivo con una ventana ya abierta lo agrega como pestaña nueva en
+esa ventana, en vez de abrir una segunda.
 
-El aviso de cambios sin guardar al cerrar no usa el cuadro nativo de
-Windows: el evento de cierre se cancela, se le pide a la interfaz que
-muestre su propio diálogo, y solo si el usuario confirma se cierra de
-verdad. Consultar la página desde el hilo del evento de cierre la
-bloquearía, porque la respuesta necesita ese mismo hilo para llegar.
+El aviso de cambios sin guardar al cerrar usa un diálogo propio con el
+mismo estilo de la app, no el cuadro nativo de Windows.
 
 ### Manejo de archivos
 
@@ -201,11 +190,6 @@ como contenido no confiable:
   explícito del usuario. Los procesos auxiliares se invocan por ruta
   absoluta, no por nombre.
 
-Limitación conocida: el puente de pywebview expone la API de archivos a la
-página, por lo que DOMPurify es la única frontera frente a un documento
-hostil. Aislar el renderizado en un `iframe` sandbox sin acceso al puente
-es la mejora pendiente si el proyecto crece.
-
 ### Pruebas
 
 Dos suites, sin frameworks de por medio:
@@ -220,9 +204,8 @@ Dos suites, sin frameworks de por medio:
   sanitización efectivamente los neutraliza. Cubre también pestañas,
   arrastre entre ventanas y el diálogo de cierre.
 
-El comportamiento de arrastre entre ventanas se verificó además moviendo el
-cursor del sistema operativo de verdad (no eventos simulados), para
-confirmar que `WindowFromPoint` detecta la ventana correcta bajo el mouse.
+El arrastre entre ventanas se verificó además moviendo el cursor del
+sistema operativo de verdad, no con eventos simulados.
 
 ```powershell
 python tests\test_files.py

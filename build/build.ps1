@@ -17,10 +17,7 @@ if ($corriendo.Count -gt 0) {
 $inicio = Get-Date
 
 Write-Host "== Dependencias =="
-python -m pip install --quiet --upgrade pywebview pyinstaller pillow
-
-Write-Host "== Icono =="
-python build\make_icon.py
+python -m pip install --quiet --upgrade pywebview pyinstaller
 
 Write-Host "== PyInstaller =="
 # --onedir en vez de --onefile: el modo de un solo archivo vuelve a extraer
@@ -34,7 +31,6 @@ python -m PyInstaller --noconfirm --clean --onedir --windowed `
   --collect-all clr_loader `
   --collect-all pythonnet `
   --exclude-module tkinter `
-  --exclude-module PIL `
   --exclude-module pygame `
   --distpath (Join-Path $root "dist") `
   --workpath (Join-Path $root "build\pyi-work") `

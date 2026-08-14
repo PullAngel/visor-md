@@ -56,7 +56,7 @@ window.Render = (function () {
   md.renderer.rules.table_close = (t, i, o, e, s) => (
     (closeTable ? closeTable(t, i, o, e, s) : '</table>') + '</div>');
 
-  /* Única barrera frente a un documento hostil: elimina script, on*= y
+  /* Sanitiza el HTML generado antes de insertarlo: quita script, on*= y
      href=javascript:. style y form se prohiben aparte por ser globales. */
   const clean = (html) => (window.DOMPurify
     ? DOMPurify.sanitize(html, {
@@ -220,9 +220,8 @@ window.Render = (function () {
     for (const block of blocks) {
       const src = block.querySelector('.mermaid-src').textContent;
       // Sin contenedor propio, mermaid arma uno temporal en <body> para medir
-      // el SVG y no siempre lo retira: con varias pestañas o retemas seguidos
-      // (algo que antes no pasaba, con el mismo documento abierto una sola
-      // vez) esos restos se acumulan y quedan flotando sobre la página.
+      // el SVG y no siempre lo retira: al renderizar varias veces esos restos
+      // se acumulan y quedan flotando sobre la página.
       const scratch = document.createElement('div');
       scratch.style.cssText = 'position:absolute;top:-9999px;left:-9999px;visibility:hidden;';
       document.body.appendChild(scratch);

@@ -553,12 +553,9 @@
   $('replace-one').addEventListener('click', replaceOne);
   $('replace-all').addEventListener('click', replaceAll);
 
-  // Arrastre de pestañas
-  //
-  // Con eventos de puntero en vez de arrastrar y soltar de HTML5: aquel
-  // marcaba con el cursor de prohibido todo lo que no fuera la propia barra,
-  // obligaba a soltar fuera de la ventana y dejaba el identificador de la
-  // pestaña pegado en cualquier campo de texto de otra aplicación.
+  // Arrastre de pestañas con eventos de puntero, no con drag-and-drop de
+  // HTML5 (que no permite soltar limpiamente fuera de la ventana ni sobre
+  // otra ventana de la misma app).
 
   let drag = null;
 
@@ -615,9 +612,7 @@
     switchTab(tabEl.dataset.id);
     drag = { id: tabEl.dataset.id, startX: e.clientX, startY: e.clientY,
              started: false, drop: null, pointerId: e.pointerId };
-    // La captura mantiene el arrastre vivo aunque el puntero salga de la
-    // ventana. Falla con punteros sintéticos, que es como llegan desde las
-    // pruebas automáticas.
+    // Mantiene el arrastre activo aunque el puntero salga de la ventana.
     try { $('tabs-scroll').setPointerCapture(e.pointerId); } catch (err) { /* sin captura */ }
   });
 
