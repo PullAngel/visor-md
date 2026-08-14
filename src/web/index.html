@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visor MD</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="vendor/katex.min.css">
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-split" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></symbol>
+  <symbol id="i-toc" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h13"/></symbol>
+  <symbol id="i-find" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h8V3M8 21v-7h8v7"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="m6 14 6-6 6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 10 6 6 6-6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+</svg>
+
+<div id="tabbar" role="tablist" aria-label="Documentos abiertos">
+  <div id="tabs-scroll"></div>
+  <button id="btn-newtab" class="icon sm" title="Nueva pestaña (Ctrl+T)"><svg><use href="#i-plus"/></svg></button>
+</div>
+
+<header id="toolbar">
+  <div class="tools-left">
+    <button id="btn-toc" class="icon" title="Índice (Ctrl+Shift+O)"><svg><use href="#i-toc"/></svg></button>
+  </div>
+
+  <div id="switch" class="switch" role="radiogroup" aria-label="Modo">
+    <span class="thumb" aria-hidden="true"></span>
+    <button id="mode-read" role="radio" aria-checked="true" title="Solo lectura (Ctrl+R)">Lectura</button>
+    <button id="mode-edit" role="radio" aria-checked="false" title="Editable (Ctrl+E)">Edición</button>
+  </div>
+
+  <div class="tools">
+    <button id="btn-split" class="icon" hidden title="Vista dividida (Ctrl+\)"><svg><use href="#i-split"/></svg></button>
+    <button id="btn-find" class="icon" title="Buscar (Ctrl+F)"><svg><use href="#i-find"/></svg></button>
+    <button id="btn-save" class="icon" hidden title="Guardar (Ctrl+S)"><svg><use href="#i-save"/></svg></button>
+    <button id="btn-theme" class="icon" title="Cambiar tema (Ctrl+D)"><svg><use href="#i-moon"/></svg></button>
+    <button id="btn-menu" class="icon" title="Más opciones"><svg><use href="#i-menu"/></svg></button>
+  </div>
+</header>
+
+<nav id="fmtbar" hidden aria-label="Ayudas de formato">
+  <button data-fmt="bold" title="Negrita (Ctrl+B)"><b>B</b></button>
+  <button data-fmt="italic" title="Cursiva (Ctrl+I)"><i>I</i></button>
+  <button data-fmt="strike" title="Tachado (Ctrl+Shift+X)"><s>S</s></button>
+  <button data-fmt="code" title="Código en línea (Ctrl+`)">&lt;/&gt;</button>
+  <span class="sep"></span>
+  <button data-fmt="h1" title="Título 1 (Ctrl+1)">H1</button>
+  <button data-fmt="h2" title="Título 2 (Ctrl+2)">H2</button>
+  <button data-fmt="h3" title="Título 3 (Ctrl+3)">H3</button>
+  <span class="sep"></span>
+  <button data-fmt="ul" title="Lista (Ctrl+Shift+8)">Lista</button>
+  <button data-fmt="ol" title="Lista numerada (Ctrl+Shift+7)">Numerada</button>
+  <button data-fmt="task" title="Tarea (Ctrl+Shift+T)">Tarea</button>
+  <button data-fmt="quote" title="Cita (Ctrl+Shift+.)">Cita</button>
+  <span class="sep"></span>
+  <button data-fmt="link" title="Enlace (Ctrl+K)">Enlace</button>
+  <button data-fmt="image" title="Imagen">Imagen</button>
+  <button data-fmt="fence" title="Bloque de código (Ctrl+Shift+C)">Bloque</button>
+  <button data-fmt="table" title="Tabla">Tabla</button>
+  <button data-fmt="hr" title="Línea horizontal">Línea</button>
+  <span class="grow"></span>
+  <button id="btn-plain" class="ghost" hidden title="Renderizar este .txt como Markdown">Interpretar como Markdown</button>
+</nav>
+
+<div id="findbar" hidden>
+  <input id="find-input" type="text" placeholder="Buscar" spellcheck="false" autocomplete="off">
+  <span id="find-count">0/0</span>
+  <button id="find-prev" class="icon sm" title="Anterior (Shift+Enter)"><svg><use href="#i-up"/></svg></button>
+  <button id="find-next" class="icon sm" title="Siguiente (Enter)"><svg><use href="#i-down"/></svg></button>
+  <input id="replace-input" type="text" placeholder="Reemplazar con" spellcheck="false" autocomplete="off" hidden>
+  <button id="replace-one" class="ghost" hidden>Reemplazar</button>
+  <button id="replace-all" class="ghost" hidden>Todo</button>
+  <button id="find-close" class="icon sm" title="Cerrar (Esc)"><svg><use href="#i-close"/></svg></button>
+</div>
+
+<main>
+  <aside id="toc" hidden><div class="toc-title">Índice</div><ol id="toc-list"></ol></aside>
+  <div id="panes">
+    <textarea id="editor" spellcheck="false" hidden placeholder="Escribir en Markdown…"></textarea>
+    <article id="preview" class="doc"></article>
+  </div>
+</main>
+
+<div id="menu" hidden role="menu">
+  <button data-act="newtab">Nueva pestaña<kbd>Ctrl+T</kbd></button>
+  <button data-act="newwindow">Nueva ventana<kbd>Ctrl+Shift+N</kbd></button>
+  <button data-act="open">Abrir…<kbd>Ctrl+O</kbd></button>
+  <button data-act="closetab">Cerrar pestaña<kbd>Ctrl+W</kbd></button>
+  <hr>
+  <button data-act="save">Guardar<kbd>Ctrl+S</kbd></button>
+  <button data-act="saveas">Guardar como…<kbd>Ctrl+Shift+S</kbd></button>
+  <button data-act="tomd" hidden>Convertir a .md</button>
+  <hr>
+  <button data-act="copyall">Copiar todo el Markdown</button>
+  <button data-act="images">Cargar imágenes remotas</button>
+  <button data-act="export">Exportar a HTML…</button>
+  <button data-act="print">Imprimir o guardar en PDF<kbd>Ctrl+P</kbd></button>
+  <button data-act="reveal">Abrir carpeta contenedora</button>
+  <hr>
+  <div class="menu-label">Tamaño de texto</div>
+  <div class="menu-row">
+    <button data-act="font-">A−</button><span id="font-val">16 px</span><button data-act="font+">A+</button>
+  </div>
+  <hr>
+  <div class="menu-label">Recientes</div>
+  <div id="recent-list"></div>
+  <hr>
+  <button data-act="install">Instalar en este equipo…</button>
+  <button data-act="defaults">Aplicaciones predeterminadas de Windows</button>
+  <button data-act="about">Acerca de Visor MD</button>
+</div>
+
+<div id="dialog" hidden>
+  <div class="dlg">
+    <h2 id="dlg-title"></h2>
+    <div id="dlg-body"></div>
+    <div class="dlg-actions">
+      <button id="dlg-ok" class="primary">Aceptar</button>
+      <button id="dlg-cancel" class="ghost">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" hidden></div>
+
+<script src="vendor/markdown-it.min.js"></script>
+<script src="vendor/markdown-it-anchor.js"></script>
+<script src="vendor/markdown-it-footnote.min.js"></script>
+<script src="vendor/markdown-it-deflist.min.js"></script>
+<script src="vendor/markdown-it-task-lists.min.js"></script>
+<script src="vendor/highlight.min.js"></script>
+<script src="vendor/purify.min.js"></script>
+<script src="vendor/katex.min.js"></script>
+<script src="vendor/katex-auto-render.min.js"></script>
+<script src="render.js"></script>
+<script src="editor.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

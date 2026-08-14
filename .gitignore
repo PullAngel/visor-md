@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+dist/
+dist-onedir/
+build/node_modules/
+build/pyi-onedir/
+build/pyi-work/
+build/package.json
+build/package-lock.json
+build/VisorMD.spec
