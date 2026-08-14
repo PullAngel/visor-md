@@ -4,11 +4,11 @@
 
 Visor y editor de Markdown para Windows. Un único ejecutable de ~14 MB, sin
 conexión a internet, que se puede fijar como programa predeterminado para
-abrir archivos `.md` fuera de cualquier editor de IA o de código.
+abrir archivos `.md` fuera de cualquier editor de código o IA. Cómodo para visualizar y editar archivos entregados por o para IA en el formato correcto y sin abrir programas pesados.
 
 **[Descargar VisorMD-portable.zip](../../releases/latest/download/VisorMD-portable.zip)**
 
-## Qué hace
+## Funciones:
 
 - **Lectura**: el documento renderizado con formato completo — tablas,
   listas de tareas, resaltado de sintaxis, diagramas y fórmulas — con botón
@@ -36,7 +36,7 @@ Los documentos de las capturas están en [`examples/`](examples).
 
 ## Instalación
 
-### Uso portable (sin instalar nada)
+### Uso portable (sin instalación)
 
 1. Descargar [`VisorMD-portable.zip`](../../releases/latest/download/VisorMD-portable.zip).
 2. Descomprimirlo en cualquier carpeta.
