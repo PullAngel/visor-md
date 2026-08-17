@@ -52,7 +52,19 @@ html, body {
   overflow: hidden;
 }
 
-body { display: flex; flex-direction: column; }
+/* Sin marco nativo, el borde lo dibuja la propia página: cierra la ventana
+   por los cuatro lados en vez de dejar el contenido cortado. */
+body {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--border);
+  box-sizing: border-box;
+}
+body.maximizada { border-width: 0; }
+
+/* Tipografía del documento, ajustable desde el menú. */
+:root { --doc-font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+:root[data-face="serif"] { --doc-font: Georgia, "Times New Roman", serif; }
+:root[data-face="mono"] { --doc-font: "Cascadia Mono", Consolas, monospace; }
 
 button { font: inherit; color: inherit; cursor: pointer; border: none; background: none; }
 ::selection { background: var(--accent); color: var(--on-accent); }
@@ -75,11 +87,12 @@ button { font: inherit; color: inherit; cursor: pointer; border: none; backgroun
 .tools-left { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; }
 .tools { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; justify-content: flex-end; }
 
-/* Barra de pestañas */
+/* Barra de pestañas: hace de barra de título, con los botones de la ventana
+   en la misma fila. La ventana no tiene marco nativo. */
 
 #tabbar {
   display: flex; align-items: flex-end; gap: 2px;
-  padding: 6px 8px 0;
+  padding: 6px 0 0 8px;
   background: var(--bg);
   flex: 0 0 auto;
   -webkit-user-select: none; user-select: none;
@@ -88,22 +101,51 @@ button { font: inherit; color: inherit; cursor: pointer; border: none; backgroun
 #tabs-scroll {
   display: flex; align-items: flex-end; gap: 2px;
   overflow-x: auto; overflow-y: hidden;
-  flex: 1 1 auto; min-width: 0;
+  flex: 0 1 auto; min-width: 0;
   scrollbar-width: none;
 }
 #tabs-scroll::-webkit-scrollbar { display: none; }
 
+/* Zona libre para arrastrar la ventana. */
+#drag-zone { flex: 1 1 auto; align-self: stretch; min-width: 24px; }
+
+.tabbar-btn {
+  display: grid; place-items: center;
+  width: 28px; height: 28px; margin: 0 0 3px 2px;
+  border-radius: 7px; flex: 0 0 auto;
+  color: var(--muted);
+}
+.tabbar-btn:hover { background: var(--surface-2); color: var(--text); }
+.tabbar-btn svg {
+  width: 15px; height: 15px; fill: none; stroke: currentColor;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* Botones de ventana: alto completo, pegados al borde, estilo Windows. */
+#winbtns { display: flex; align-self: stretch; flex: 0 0 auto; margin-left: 4px; }
+#winbtns button {
+  width: 44px; display: grid; place-items: center;
+  color: var(--muted); border-radius: 0;
+}
+#winbtns button:hover { background: var(--surface-2); color: var(--text); }
+#win-close:hover { background: #C42B1C; color: #fff; }
+#winbtns svg {
+  width: 15px; height: 15px; fill: none; stroke: currentColor;
+  stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+}
+
 .tab {
   display: flex; align-items: center; gap: 6px;
-  min-width: 120px; max-width: 220px;
-  padding: 7px 8px 7px 12px;
+  min-width: 90px; max-width: 200px;
+  padding: 7px 6px 7px 12px;
   border-radius: 8px 8px 0 0;
   background: var(--surface-2);
   color: var(--muted);
   font-size: 12.5px;
   cursor: pointer;
-  flex: 0 1 auto;
+  flex: 1 1 160px;
 }
+.tab.draft .tab-name { font-style: italic; }
 .tab:hover { background: var(--surface); color: var(--text); }
 .tab.active { background: var(--surface); color: var(--text); font-weight: 600; }
 .tab.dragging { opacity: .35; }
@@ -141,11 +183,26 @@ button { font: inherit; color: inherit; cursor: pointer; border: none; backgroun
 .tab-close:hover { background: var(--tint); opacity: 1; }
 .tab-close svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 2; }
 
-#btn-newtab {
-  width: 28px; height: 28px; margin-bottom: 2px;
-  flex: 0 0 auto;
+/* Lista desplegable con todas las pestañas abiertas. */
+#tablist {
+  position: absolute; top: 40px; right: 8px; z-index: 45;
+  min-width: 260px; max-width: 380px; max-height: 60vh; overflow-y: auto;
+  padding: 6px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: var(--shadow);
 }
-#btn-newtab svg { width: 15px; height: 15px; }
+#tablist button {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 7px 10px; border-radius: 8px;
+  font-size: 13px; text-align: left; color: var(--text);
+}
+#tablist button:hover { background: var(--tint); }
+#tablist button.active { color: var(--accent); font-weight: 600; }
+#tablist .tl-name {
+  flex: 1 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#tablist .tl-dirty { color: var(--accent); font-size: 9px; flex: 0 0 auto; }
 
 button.icon {
   width: 34px; height: 34px;
@@ -309,6 +366,7 @@ body[data-split="on"] #editor { border-right: 1px solid var(--border); }
 
 .doc {
   max-width: 860px; margin: 0 auto;
+  font-family: var(--doc-font);
   font-size: var(--doc-size, 16px);
   line-height: 1.75;
   word-wrap: break-word;
@@ -344,6 +402,40 @@ body[data-split="on"] #editor { border-right: 1px solid var(--border); }
   color: var(--muted);
 }
 .doc blockquote > :last-child { margin-bottom: 0; }
+
+/* Alertas de GitHub */
+.doc .alert { border-left-color: var(--alert); background: var(--alert-bg); color: var(--text); }
+.doc .alert-title {
+  margin: 0 0 .4em; font-weight: 650; color: var(--alert);
+  display: flex; align-items: center; gap: .45em;
+}
+.doc .alert-title::before {
+  content: ""; flex: 0 0 auto;
+  width: 1.05em; height: 1.05em;
+  background: var(--alert);
+  -webkit-mask: var(--alert-icon) center / contain no-repeat;
+  mask: var(--alert-icon) center / contain no-repeat;
+}
+.doc .alert-note {
+  --alert: #4493F8; --alert-bg: #4493F814;
+  --alert-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 0a8 8 0 110 16A8 8 0 018 0zm.75 4.75a.75.75 0 10-1.5 0 .75.75 0 001.5 0zM8 7a.75.75 0 00-.75.75v3.5a.75.75 0 001.5 0v-3.5A.75.75 0 008 7z"/></svg>');
+}
+.doc .alert-tip {
+  --alert: #3FB950; --alert-bg: #3FB95014;
+  --alert-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 0a5.5 5.5 0 00-3.3 9.9c.4.3.6.7.7 1.1l.2.9c.1.3.4.6.8.6h3.2c.4 0 .7-.3.8-.6l.2-.9c.1-.4.3-.8.7-1.1A5.5 5.5 0 008 0zM6 14.5c0-.3.2-.5.5-.5h3c.3 0 .5.2.5.5s-.2.5-.5.5h-3a.5.5 0 01-.5-.5z"/></svg>');
+}
+.doc .alert-important {
+  --alert: #AB7DF8; --alert-bg: #AB7DF814;
+  --alert-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 2.75C0 1.8.8 1 1.75 1h12.5c1 0 1.75.8 1.75 1.75v9.5c0 1-.8 1.75-1.75 1.75H8.06l-2.6 2.6a.75.75 0 01-1.28-.53v-2.07H1.75A1.75 1.75 0 010 12.25zM8.75 4.75a.75.75 0 00-1.5 0v3a.75.75 0 001.5 0zM8 10a.75.75 0 100 1.5A.75.75 0 008 10z"/></svg>');
+}
+.doc .alert-warning {
+  --alert: #D29922; --alert-bg: #D2992214;
+  --alert-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M6.46 1.14a1.75 1.75 0 013.08 0l5.7 10.32A1.75 1.75 0 0113.7 14H2.3a1.75 1.75 0 01-1.54-2.54zM8 5a.75.75 0 00-.75.75v2.5a.75.75 0 001.5 0v-2.5A.75.75 0 008 5zm0 5.5a.75.75 0 100 1.5.75.75 0 000-1.5z"/></svg>');
+}
+.doc .alert-caution {
+  --alert: #F85149; --alert-bg: #F8514914;
+  --alert-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4.47 1.4A1.75 1.75 0 015.7.9h4.6c.47 0 .92.19 1.24.51l3.05 3.05c.32.32.51.77.51 1.24v4.6c0 .47-.19.92-.51 1.24l-3.05 3.05c-.32.32-.77.51-1.24.51H5.7c-.47 0-.92-.19-1.24-.51L1.41 11.6a1.75 1.75 0 01-.51-1.24V5.7c0-.47.19-.92.51-1.24zM8 4.25a.75.75 0 00-.75.75v3.5a.75.75 0 001.5 0V5A.75.75 0 008 4.25zm0 6a.75.75 0 100 1.5.75.75 0 000-1.5z"/></svg>');
+}
 .doc img { max-width: 100%; border-radius: 8px; }
 .doc img[data-blocked] {
   display: inline-block; min-width: 240px; padding: 14px 16px;
@@ -508,6 +600,29 @@ body[data-split="on"] #editor { border-right: 1px solid var(--border); }
 #recent-list:empty::after {
   content: "Sin archivos recientes";
   display: block; padding: 4px 10px 8px; font-size: 12.5px; color: var(--muted);
+}
+
+/* Menú del clic derecho: mismo estilo que el menú principal. */
+
+#ctxmenu {
+  position: fixed; z-index: 55;
+  min-width: 210px; padding: 6px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: var(--shadow);
+}
+#ctxmenu button {
+  display: flex; align-items: center; justify-content: space-between; gap: 20px;
+  width: 100%; padding: 7px 10px; border-radius: 7px;
+  font-size: 13px; text-align: left;
+}
+#ctxmenu button:hover { background: var(--tint); }
+#ctxmenu kbd { color: var(--muted); font-size: 11px; font-family: inherit; }
+#ctxmenu hr { border: none; border-top: 1px solid var(--border); margin: 5px 4px; }
+
+.menu-row.typeface { gap: 4px; }
+.menu-row.typeface button { flex: 1; font-size: 12.5px; }
+.menu-row.typeface button[aria-pressed="true"] {
+  background: var(--accent-active); color: var(--on-accent);
 }
 
 /* Dialogo y aviso */

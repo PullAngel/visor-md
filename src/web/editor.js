@@ -122,6 +122,16 @@ window.Editor = (function () {
       const nl = s > 0 && val()[s - 1] !== '\n' ? '\n' : '';
       insert(nl + '\n---\n\n');
     },
+    alert: () => {
+      const s = ta.selectionStart;
+      const sel = val().slice(s, ta.selectionEnd);
+      const nl = s > 0 && val()[s - 1] !== '\n' ? '\n' : '';
+      const cuerpo = (sel || 'Texto de la alerta').split('\n').map((l) => '> ' + l).join('\n');
+      const text = `${nl}> [!NOTE]\n${cuerpo}\n`;
+      // Deja seleccionado NOTE para cambiarlo por TIP, WARNING, etc.
+      replaceRange(s, ta.selectionEnd, text,
+                   s + nl.length + 4, s + nl.length + 8);
+    },
   };
 
   function apply(kind) {

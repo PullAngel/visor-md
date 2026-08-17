@@ -26,10 +26,12 @@ import base64
 import ctypes
 import json
 import os
+import shutil
 import socket
 import sys
 import tempfile
 import threading
+import time
 import uuid
 import webbrowser
 import zlib
@@ -65,6 +67,12 @@ SINGLETON_PORT = 51900 + (zlib.crc32(os.environ.get("USERNAME", "user").encode()
 _singleton_socket: "socket.socket | None" = None
 _app: "App | None" = None
 
+# Rutas que llegaron de otras instancias antes de que la interfaz estuviera
+# lista. Abrir varios archivos a la vez desde el Explorador lanza un proceso
+# por archivo, y todos llegan mucho antes de que la ventana termine de cargar.
+_pending_paths: list[str] = []
+_pending_lock = threading.Lock()
+
 
 def resource(*parts) -> Path:
     """Resolver la ruta de un recurso desde el código fuente o desde el ejecutable."""
@@ -98,6 +106,41 @@ def cursor_position() -> tuple[int, int]:
     point = _Point()
     ctypes.windll.user32.GetCursorPos(ctypes.byref(point))
     return point.x, point.y
+
+
+def clear_web_cache() -> None:
+    """Vaciar la caché HTTP del perfil de WebView2 al arrancar.
+
+    La interfaz se sirve desde un servidor local, así que el navegador la
+    guarda en caché y tras actualizar la aplicación seguiría mostrando la
+    versión anterior. El resto del perfil se conserva: es lo que hace que el
+    arranque sea rápido.
+    """
+    cache = WEBVIEW_PROFILE / "EBWebView" / "Default" / "Cache"
+    try:
+        shutil.rmtree(cache)
+    except OSError:
+        pass
+
+
+def restore_resize_border(hwnd: int) -> None:
+    """Devolver los bordes de redimensionado a una ventana sin marco.
+
+    Sin marco, Windows la trata como emergente: no se puede redimensionar
+    arrastrando los bordes ni acoplar a los lados. WS_THICKFRAME recupera las
+    dos cosas sin traer de vuelta la barra de título.
+    """
+    if not hwnd:
+        return
+    user32 = ctypes.windll.user32
+    user32.GetWindowLongPtrW.restype = ctypes.c_longlong
+    user32.SetWindowLongPtrW.restype = ctypes.c_longlong
+    style = user32.GetWindowLongPtrW(hwnd, -16)  # GWL_STYLE
+    nuevo = style | 0x00040000 | 0x00010000 | 0x00020000  # THICKFRAME, MAX, MINBOX
+    if nuevo == style:
+        return
+    user32.SetWindowLongPtrW(hwnd, -16, ctypes.c_longlong(nuevo))
+    user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0x0020 | 0x0002 | 0x0001 | 0x0004)
 
 
 def window_under_cursor() -> int:
@@ -202,6 +245,7 @@ class WindowApi:
         self._size: tuple[int, int] | None = None
         self._shown = False
         self._force_close = False
+        self._maximized = False
 
     def attach(self, window) -> None:
         self._window = window
@@ -264,8 +308,9 @@ class WindowApi:
         """
         if self._window and not self._shown:
             self._shown = True
+            restore_resize_border(self.hwnd())
             self._window.show()
-            self.hwnd()
+        flush_pending_paths()
 
     def focus_window(self) -> None:
         with self._app.lock:
@@ -303,6 +348,42 @@ class WindowApi:
 
     def new_window(self, path: str | None = None) -> dict:
         create_window(self._app, path=path)
+        return {"ok": True}
+
+    # Barra de título propia
+
+    def minimize_window(self) -> None:
+        self._window.minimize()
+
+    def toggle_maximize(self) -> bool:
+        """Alternar maximizado. Devuelve el estado nuevo para el icono."""
+        self._maximized = not self._maximized
+        if self._maximized:
+            self._window.maximize()
+        else:
+            self._window.restore()
+        return self._maximized
+
+    def move_window(self, dx: int, dy: int) -> None:
+        """Desplazar la ventana mientras se arrastra por la barra de pestañas."""
+        hwnd = self.hwnd()
+        if not hwnd:
+            return
+        if self._maximized:  # Arrastrar una ventana maximizada la restaura.
+            self._maximized = False
+            self._window.restore()
+        rect = (ctypes.c_long * 4)()
+        ctypes.windll.user32.GetWindowRect(hwnd, ctypes.byref(rect))
+        ctypes.windll.user32.SetWindowPos(
+            hwnd, 0, rect[0] + int(dx), rect[1] + int(dy), 0, 0,
+            0x0001 | 0x0004)  # SWP_NOSIZE | SWP_NOZORDER
+
+    def move_tab_to_new_window(self, doc_id: str, text: str) -> dict:
+        """Mandar una pestaña a una ventana nueva desde el menú contextual."""
+        doc = self._docs.pop(doc_id, None)
+        if not doc:
+            return {"ok": False}
+        create_window(self._app, pending=(doc, text))
         return {"ok": True}
 
     def drop_tab(self, doc_id: str, text: str, allow_new_window: bool = True) -> dict:
@@ -563,7 +644,7 @@ def create_window(app: App, *, path: str | None = None,
         APP_NAME, url=str(resource("web", "index.html")), js_api=api,
         width=int(s.get("width", 1100)), height=int(s.get("height", 780)),
         min_size=(560, 420), background_color=DARK_BG, text_select=True,
-        hidden=True, **extra)
+        hidden=True, frameless=True, easy_drag=False, **extra)
     api.attach(window)
     app.register(api)
     # Si la interfaz no llegara a arrancar, la ventana se muestra igual.
@@ -583,19 +664,50 @@ def _acquire_singleton() -> bool:
     except OSError:
         s.close()
         return False
-    s.listen(5)
+    # Cola amplia: seleccionar varios archivos en el Explorador lanza un
+    # proceso por archivo y todos se conectan a la vez.
+    s.listen(64)
     _singleton_socket = s
     return True
 
 
 def _forward_to_primary(path: str) -> bool:
-    """Enviar una ruta a la instancia principal por el socket de instancia única."""
-    try:
-        with socket.create_connection(("127.0.0.1", SINGLETON_PORT), timeout=1.5) as c:
-            c.sendall((path or "").encode("utf-8") + b"\n")
-        return True
-    except OSError:
-        return False
+    """Enviar una ruta a la instancia principal por el socket de instancia única.
+
+    Reintenta unos segundos: con muchos archivos a la vez, la principal puede
+    estar todavía enlazando el puerto cuando llegan las demás instancias.
+    """
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", SINGLETON_PORT), timeout=1) as c:
+                c.sendall((path or "").encode("utf-8") + b"\n")
+            return True
+        except OSError:
+            time.sleep(0.15)
+    return False
+
+
+def deliver_path(path: str) -> None:
+    """Abrir una ruta recibida de otra instancia, o encolarla si aún no se puede."""
+    window = _app.focused_window() if _app else None
+    if window is None or not window._shown:
+        with _pending_lock:
+            _pending_paths.append(path)
+        return
+    window.open_external_tab(path)
+
+
+def flush_pending_paths() -> None:
+    """Abrir las rutas que llegaron mientras la interfaz arrancaba."""
+    with _pending_lock:
+        paths = list(_pending_paths)
+        _pending_paths.clear()
+    window = _app.focused_window() if _app else None
+    if window is None:
+        return
+    for path in paths:
+        window.open_external_tab(path)
 
 
 def _run_singleton_server() -> None:
@@ -621,10 +733,8 @@ def _run_singleton_server() -> None:
         finally:
             conn.close()
         path = data.decode("utf-8", "replace").strip()
-        if path and _app:
-            window = _app.focused_window()
-            if window:
-                window.open_external_tab(path)
+        if path:
+            deliver_path(path)
 
 
 def main() -> int:
@@ -655,6 +765,7 @@ def main() -> int:
             return 0
         # Si no se pudo reenviar, esta instancia abre su propia ventana.
 
+    clear_web_cache()
     _app = App()
     create_window(_app, path=target)
 

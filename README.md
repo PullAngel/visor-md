@@ -15,10 +15,12 @@ abrir archivos `.md` fuera de cualquier editor de código o IA. Cómodo para vis
   de copiar en cada bloque de código.
 - **Edición**: editor de texto plano con barra de ayudas de formato y
   atajos de teclado, con vista dividida para ver el resultado en vivo.
-- **Pestañas y ventanas, como en un navegador**: abrir varios archivos los
-  agrega como pestañas de una misma ventana. Se arrastran para reordenarlas,
-  se sueltan fuera de la barra para abrirlas en una ventana propia, o sobre
-  otra ventana para moverlas ahí.
+- **Pestañas y ventanas, como en un navegador**: abrir varios archivos a la
+  vez los agrega como pestañas de una misma ventana. Se arrastran para
+  reordenarlas, se sueltan fuera de la barra para abrirlas en una ventana
+  propia, o sobre otra ventana para moverlas ahí.
+- **Menú contextual** con clic derecho, distinto según dónde se haga: sobre
+  una pestaña, sobre el editor o sobre el documento renderizado.
 - **Exporta a PDF** (o a HTML) para compartir el documento renderizado fuera
   de la app.
 - Abre también archivos `.txt`, con la opción de convertirlos a `.md`.
@@ -102,6 +104,7 @@ Listas anidadas y numeradas, tablas con alineación, bloques de código dentro
 de listas y citas, enlaces inline y de referencia, imágenes locales, HTML,
 `<details>`, casillas de verificación, encabezados ATX y setext, escapes,
 vallas de código de cuatro backticks y de `~~~`, notas al pie, autolinks,
+alertas de GitHub (`> [!NOTE]`, `TIP`, `IMPORTANT`, `WARNING`, `CAUTION`),
 fórmulas LaTeX (KaTeX), diagramas Mermaid y frontmatter YAML, que se oculta
 igual que en GitHub.
 
@@ -109,6 +112,13 @@ igual que en GitHub.
 
 - **Buscar y reemplazar**, en lectura y en edición.
 - **Índice lateral** generado a partir de los encabezados del documento.
+- **Tipografía del documento** ajustable entre sistema, serif y monoespaciada.
+- Al pasar de lectura a edición se **conserva el punto del documento** donde
+  se estaba leyendo, con el cursor ya puesto ahí.
+- Las pestañas sin guardar **toman su nombre del contenido** —el primer
+  título, o la primera línea de texto— y se distinguen en cursiva.
+- Con muchas pestañas abiertas, la barra se desplaza con la rueda del mouse
+  y un botón despliega la lista completa para saltar a cualquiera.
 - **Archivos recientes** y detección de cambios hechos por otro programa
   mientras el documento está abierto.
 - **Imágenes remotas bloqueadas por defecto**: solo se cargan si el usuario
@@ -162,10 +172,22 @@ muda con su texto sin guardar; si no hay ninguna, se abre una ventana nueva
 en ese punto.
 
 Abrir un archivo con una ventana ya abierta lo agrega como pestaña nueva en
-esa ventana, en vez de abrir una segunda.
+esa ventana, en vez de abrir una segunda. Seleccionar ocho archivos en el
+Explorador y abrirlos de golpe lanza ocho procesos casi simultáneos: los que
+llegan antes de que la primera ventana termine de cargarse quedan en una cola
+y se vuelcan como pestañas en cuanto está lista.
 
 El aviso de cambios sin guardar al cerrar usa un diálogo propio con el
 mismo estilo de la app, no el cuadro nativo de Windows.
+
+### Barra de título propia
+
+La ventana no usa el marco de Windows: las pestañas ocupan la misma fila que
+los botones de minimizar, maximizar y cerrar, sin la franja gris que quedaría
+encima. Quitar el marco también quita los bordes de redimensionado y el
+acople de ventanas, así que el estilo `WS_THICKFRAME` se vuelve a aplicar
+sobre la ventana ya creada: se recupera el arrastre desde los bordes y Aero
+Snap, pero sin barra de título nativa.
 
 ### Manejo de archivos
 

@@ -43,6 +43,13 @@ if ((Get-Item $exe).LastWriteTime -lt $inicio) {
   throw "dist\VisorMD quedo con la version vieja: los archivos estaban bloqueados."
 }
 
+Write-Host "== Limpieza =="
+# Documentacion de la API de pythonnet, sin uso en ejecucion. Las carpetas
+# runtimes\win-arm64 y win-x86 no se tocan: pywebview comprueba que existan
+# aunque cargue la variante x64.
+$xml = Join-Path $root "dist\VisorMD\_internal\pythonnet\runtime\Python.Runtime.xml"
+if (Test-Path $xml) { Remove-Item $xml -Force }
+
 Write-Host "== Zip portable =="
 $zip = Join-Path $root "dist\VisorMD-portable.zip"
 if (Test-Path $zip) { Remove-Item $zip }

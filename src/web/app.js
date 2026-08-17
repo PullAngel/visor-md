@@ -23,6 +23,13 @@
   const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+  /** Cargar texto en el editor dejando el cursor al principio.
+      Asignar `value` lo manda al final, y el foco arrastra el scroll con él. */
+  function setEditorText(text) {
+    editor.value = text;
+    editor.setSelectionRange(0, 0);
+  }
+
   /** Volcar el editor en la pestaña activa: su texto vive en el DOM hasta acá. */
   function syncActive() {
     const tab = active();
@@ -82,25 +89,39 @@
 
   // Barra de pestañas
 
+  /** Nombre de una pestaña sin archivo: primer encabezado o primera línea. */
+  function draftName(tab) {
+    const text = (tab.id === activeId ? editor.value : tab.text) || '';
+    for (const raw of text.split('\n')) {
+      const line = raw.replace(/^#{1,6}\s+/, '').replace(/[*_`>~-]/g, '').trim();
+      if (line) return line.length > 24 ? line.slice(0, 24) + '…' : line;
+    }
+    return 'Sin título';
+  }
+
+  const tabLabel = (tab) => (tab.path ? tab.name : draftName(tab));
+
   function renderTabbar() {
     const box = $('tabs-scroll');
     box.innerHTML = '';
     for (const tab of tabs.values()) {
       const el = document.createElement('div');
-      el.className = 'tab' + (tab.id === activeId ? ' active' : '');
+      el.className = 'tab' + (tab.id === activeId ? ' active' : '')
+        + (tab.path ? '' : ' draft');
       el.dataset.id = tab.id;
       el.setAttribute('role', 'tab');
-      el.title = tab.path || tab.name;
+      el.title = tab.path || (tabLabel(tab) + ' — sin guardar');
       el.innerHTML = `<span class="tab-name"></span>
         <span class="tab-dirty" ${tab.dirty ? '' : 'hidden'}>&#9679;</span>
         <button class="tab-close" title="Cerrar (Ctrl+W)"><svg><use href="#i-close"/></svg></button>`;
-      el.querySelector('.tab-name').textContent = tab.name;
+      el.querySelector('.tab-name').textContent = tabLabel(tab);
       box.appendChild(el);
     }
+    requestAnimationFrame(updateTabOverflow);
   }
 
   function updateActiveTabChrome(tab) {
-    document.title = (tab.dirty ? '* ' : '') + tab.name + ' - Visor MD';
+    document.title = (tab.dirty ? '* ' : '') + tabLabel(tab) + ' - Visor MD';
     $('btn-plain').hidden = isMarkdown(tab);
     $('menu').querySelector('[data-act="tomd"]').hidden = isMarkdown(tab);
   }
@@ -167,7 +188,7 @@
     }
     activeId = id;
     closeFind();
-    editor.value = tab.text;
+    setEditorText(tab.text);
     updateActiveTabChrome(tab);
     applyMode(tab, false);
     rerender(true);
@@ -216,7 +237,7 @@
     if (tab.plain) tab.mode = 'edit';
     tab.dirty = false;
     if (tab.id === activeId) {
-      editor.value = tab.text;
+      setEditorText(tab.text);
       updateActiveTabChrome(tab);
       applyMode(tab, false);
       rerender(true);
@@ -278,12 +299,40 @@
     }
   }
 
+  /** Proporción de scroll de un panel, de 0 a 1. */
+  function scrollRatio(el) {
+    const max = el.scrollHeight - el.clientHeight;
+    return max > 0 ? el.scrollTop / max : 0;
+  }
+
+  function applyScrollRatio(el, ratio) {
+    const max = el.scrollHeight - el.clientHeight;
+    el.scrollTop = max > 0 ? ratio * max : 0;
+  }
+
   function setMode(mode) {
     const tab = active();
     if (!tab) return;
+    if (tab.mode === mode) return;
+    // Conservar el punto de lectura al cambiar de modo.
+    const ratio = scrollRatio(tab.mode === 'edit' ? editor : preview);
     if (tab.mode === 'edit' && mode === 'read') syncActive();
     tab.mode = mode;
     applyMode(tab, true);
+    if (mode === 'edit') {
+      // El editor se posiciona por número de línea: su altura de scroll aún no
+      // es fiable recién mostrado, y el foco lo arrastraría al cursor.
+      const lines = editor.value.split('\n');
+      const target = Math.round(ratio * lines.length);
+      const pos = lines.slice(0, target).join('\n').length;
+      editor.setSelectionRange(pos, pos);
+      const lh = parseFloat(getComputedStyle(editor).lineHeight) || 24;
+      const top = Math.max(0, (target * lh) - editor.clientHeight / 3);
+      editor.scrollTop = top;
+      requestAnimationFrame(() => { editor.scrollTop = top; });
+    } else {
+      requestAnimationFrame(() => applyScrollRatio(preview, ratio));
+    }
   }
 
   function setSplit(on) {
@@ -317,6 +366,15 @@
     persist();
   }
 
+  function setTypeface(face) {
+    settings.face = ['serif', 'mono'].includes(face) ? face : 'sans';
+    document.documentElement.dataset.face = settings.face;
+    $('menu').querySelectorAll('[data-face]').forEach((b) => {
+      b.setAttribute('aria-pressed', String(b.dataset.face === settings.face));
+    });
+    persist();
+  }
+
   let persistTimer = null;
   function persist() {
     if (!settings.ready) return;
@@ -324,7 +382,7 @@
     persistTimer = setTimeout(() => {
       call('save_settings', {
         theme: settings.theme, mode: settings.defaultMode, split: settings.defaultSplit,
-        toc: settings.toc, font_size: settings.fontSize,
+        toc: settings.toc, font_size: settings.fontSize, face: settings.face,
       }).catch(() => {});
     }, 400);
   }
@@ -488,11 +546,18 @@
 
   // Eventos del editor
 
+  let labelTimer = null;
   function onInput() {
     const tab = active();
     if (!tab) return;
     tab.text = editor.value;
     if (!tab.dirty) setDirty(tab, true);
+    // Una pestaña sin archivo se nombra por su contenido: hay que refrescarla
+    // mientras se escribe, no solo al ensuciarse.
+    if (!tab.path) {
+      clearTimeout(labelTimer);
+      labelTimer = setTimeout(() => { renderTabbar(); updateActiveTabChrome(tab); }, 400);
+    }
     if (tab.mode === 'edit' && (tab.split || tab.plain)) rerender(false);
   }
 
@@ -668,6 +733,77 @@
 
   $('btn-newtab').addEventListener('click', () => newTab());
 
+  // La barra de pestañas se desplaza con la rueda cuando hay muchas abiertas.
+  $('tabs-scroll').addEventListener('wheel', (e) => {
+    if (e.deltaY === 0) return;
+    e.preventDefault();
+    $('tabs-scroll').scrollLeft += e.deltaY;
+  }, { passive: false });
+
+  // Barra de título propia
+
+  $('win-min').addEventListener('click', () => call('minimize_window').catch(() => {}));
+  $('win-max').addEventListener('click', () => toggleMaximize());
+  $('win-close').addEventListener('click', () => call('close_window').catch(() => {}));
+
+  async function toggleMaximize() {
+    const max = await call('toggle_maximize').catch(() => null);
+    if (max === null) return;
+    document.body.classList.toggle('maximizada', max);
+    $('win-max').firstElementChild.firstElementChild
+      .setAttribute('href', max ? '#i-restore' : '#i-max');
+  }
+
+  // Arrastrar la ventana desde el hueco libre de la barra.
+  let winDrag = null;
+  $('drag-zone').addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    winDrag = { x: e.screenX, y: e.screenY };
+    $('drag-zone').setPointerCapture(e.pointerId);
+  });
+  $('drag-zone').addEventListener('pointermove', (e) => {
+    if (!winDrag) return;
+    const dx = e.screenX - winDrag.x;
+    const dy = e.screenY - winDrag.y;
+    if (!dx && !dy) return;
+    winDrag = { x: e.screenX, y: e.screenY };
+    call('move_window', dx, dy).catch(() => {});
+  });
+  $('drag-zone').addEventListener('pointerup', () => { winDrag = null; });
+  $('drag-zone').addEventListener('dblclick', () => toggleMaximize());
+
+  // Lista de todas las pestañas
+
+  function renderTabList() {
+    const box = $('tablist');
+    box.innerHTML = '';
+    for (const tab of tabs.values()) {
+      const b = document.createElement('button');
+      b.className = tab.id === activeId ? 'active' : '';
+      b.title = tab.path || '';
+      b.innerHTML = '<span class="tl-name"></span>'
+        + (tab.dirty ? '<span class="tl-dirty">&#9679;</span>' : '');
+      b.querySelector('.tl-name').textContent = tabLabel(tab);
+      b.addEventListener('click', () => {
+        box.hidden = true;
+        switchTab(tab.id);
+      });
+      box.appendChild(b);
+    }
+  }
+
+  $('btn-tablist').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const box = $('tablist');
+    if (box.hidden) { renderTabList(); box.hidden = false; } else { box.hidden = true; }
+  });
+
+  /** El selector de pestañas solo aparece cuando dejan de entrar en la barra. */
+  function updateTabOverflow() {
+    const strip = $('tabs-scroll');
+    $('btn-tablist').hidden = strip.scrollWidth <= strip.clientWidth + 4;
+  }
+
   // Menú
 
   function toggleMenu(show) {
@@ -759,6 +895,8 @@
   };
 
   $('menu').addEventListener('click', (e) => {
+    const face = e.target.closest('button[data-face]');
+    if (face) { setTypeface(face.dataset.face); return; }
     const btn = e.target.closest('button[data-act]');
     if (!btn) return;
     const act = btn.dataset.act;
@@ -794,6 +932,156 @@
     if (go) call('open_default_apps').catch(() => {});
   }
 
+  // Menú del clic derecho
+  //
+  // WebView2 no trae menú nativo fuera de modo depuración, así que se arma uno
+  // propio con lo que corresponde a lo que hay debajo del puntero.
+
+  function closeCtx() { $('ctxmenu').hidden = true; }
+
+  function showCtx(x, y, items) {
+    const box = $('ctxmenu');
+    box.innerHTML = '';
+    let last = null;
+    for (const it of items) {
+      if (!it) continue;
+      if (it === '-') {
+        if (last === '-' || !box.childElementCount) continue;
+        box.appendChild(document.createElement('hr'));
+      } else {
+        const b = document.createElement('button');
+        b.innerHTML = `<span></span>${it.key ? `<kbd>${it.key}</kbd>` : ''}`;
+        b.firstElementChild.textContent = it.label;
+        b.addEventListener('click', () => { closeCtx(); it.run(); });
+        box.appendChild(b);
+      }
+      last = it === '-' ? '-' : null;
+    }
+    if (!box.childElementCount) return;
+    box.hidden = false;
+    // Reubicar si se sale por el borde derecho o inferior.
+    const r = box.getBoundingClientRect();
+    box.style.left = Math.min(x, window.innerWidth - r.width - 8) + 'px';
+    box.style.top = Math.min(y, window.innerHeight - r.height - 8) + 'px';
+  }
+
+  const selectedText = () => String(window.getSelection() || '').trim();
+
+  function ctxForTab(tabEl) {
+    const id = tabEl.dataset.id;
+    const tab = tabs.get(id);
+    const ids = Array.from(tabs.keys());
+    const idx = ids.indexOf(id);
+    return [
+      { label: 'Cerrar pestaña', key: 'Ctrl+W', run: () => closeTab(id) },
+      { label: 'Cerrar las demás', run: async () => {
+        for (const other of ids.filter((x) => x !== id)) await closeTab(other);
+      } },
+      { label: 'Cerrar las de la derecha', run: async () => {
+        for (const other of ids.slice(idx + 1)) await closeTab(other);
+      } },
+      '-',
+      { label: 'Mover a una ventana nueva', run: async () => {
+        if (tabs.size < 2) return;
+        syncActive();
+        const res = await call('move_tab_to_new_window', id, textOf(tab)).catch(() => null);
+        if (res && res.ok) dropTabLocally(id);
+      } },
+      tab && tab.path ? '-' : null,
+      tab && tab.path
+        ? { label: 'Copiar ruta', run: () => navigator.clipboard.writeText(tab.path) }
+        : null,
+      tab && tab.path
+        ? { label: 'Abrir carpeta contenedora', run: () => call('reveal', id).catch(() => {}) }
+        : null,
+    ];
+  }
+
+  function ctxForEditor() {
+    const sel = editor.selectionStart !== editor.selectionEnd;
+    const fmt = (kind) => () => { Editor.apply(kind); onInput(); };
+    return [
+      { label: 'Cortar', key: 'Ctrl+X', run: () => {
+        if (!sel) return;
+        navigator.clipboard.writeText(editor.value.slice(editor.selectionStart, editor.selectionEnd));
+        document.execCommand('insertText', false, '');
+        onInput();
+      } },
+      { label: 'Copiar', key: 'Ctrl+C', run: () => {
+        navigator.clipboard.writeText(editor.value.slice(editor.selectionStart, editor.selectionEnd));
+      } },
+      { label: 'Pegar', key: 'Ctrl+V', run: async () => {
+        try {
+          const text = await navigator.clipboard.readText();
+          editor.focus();
+          document.execCommand('insertText', false, text);
+          onInput();
+        } catch (e) { toast('Usá Ctrl+V para pegar'); }
+      } },
+      '-',
+      { label: 'Negrita', key: 'Ctrl+B', run: fmt('bold') },
+      { label: 'Cursiva', key: 'Ctrl+I', run: fmt('italic') },
+      { label: 'Código', key: 'Ctrl+`', run: fmt('code') },
+      { label: 'Enlace', key: 'Ctrl+K', run: fmt('link') },
+      '-',
+      { label: 'Seleccionar todo', key: 'Ctrl+A', run: () => editor.select() },
+    ];
+  }
+
+  function ctxForPreview(target) {
+    const link = target.closest('a[href]');
+    const href = link ? link.getAttribute('href') : '';
+    const block = target.closest('.codeblock');
+    const img = target.closest('img');
+    const sel = selectedText();
+    return [
+      sel ? { label: 'Copiar', key: 'Ctrl+C',
+              run: () => navigator.clipboard.writeText(sel) } : null,
+      sel ? { label: `Buscar "${sel.length > 18 ? sel.slice(0, 18) + '…' : sel}"`,
+              run: () => { $('find-input').value = sel; openFind(false); runFind(sel); } } : null,
+      link && /^(https?:|mailto:)/i.test(href)
+        ? { label: 'Abrir en el navegador', run: () => call('open_external', href).catch(() => {}) }
+        : null,
+      link ? { label: 'Copiar dirección del enlace',
+               run: () => navigator.clipboard.writeText(href) } : null,
+      block ? { label: 'Copiar bloque de código', run: () => {
+        navigator.clipboard.writeText(block.querySelector('code').textContent);
+        toast('Bloque copiado');
+      } } : null,
+      img && img.dataset.blocked
+        ? { label: 'Cargar imágenes remotas', run: () => MENU_ACTIONS.images() }
+        : null,
+      '-',
+      { label: 'Editar este documento', key: 'Ctrl+E', run: () => setMode('edit') },
+      { label: 'Copiar todo el Markdown', run: () => MENU_ACTIONS.copyall() },
+    ];
+  }
+
+  document.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const tabEl = e.target.closest('.tab');
+    if (tabEl) { showCtx(e.clientX, e.clientY, ctxForTab(tabEl)); return; }
+    if (e.target === editor) { showCtx(e.clientX, e.clientY, ctxForEditor()); return; }
+    if (e.target.closest('#preview')) {
+      showCtx(e.clientX, e.clientY, ctxForPreview(e.target));
+      return;
+    }
+    showCtx(e.clientX, e.clientY, [
+      { label: 'Nueva pestaña', key: 'Ctrl+T', run: () => newTab() },
+      { label: 'Abrir…', key: 'Ctrl+O', run: () => MENU_ACTIONS.open() },
+      { label: 'Nueva ventana', key: 'Ctrl+Shift+N',
+        run: () => call('new_window').catch(() => {}) },
+    ]);
+  });
+
+  document.addEventListener('pointerdown', (e) => {
+    if (!$('ctxmenu').hidden && !e.target.closest('#ctxmenu')) closeCtx();
+    if (!$('tablist').hidden && !e.target.closest('#tablist, #btn-tablist')) {
+      $('tablist').hidden = true;
+    }
+  });
+  window.addEventListener('blur', closeCtx);
+
   // Enlaces del documento. Solo se abren http, https y mailto; el resto queda
   // inerte. auxclick cubre el clic central, que no dispara el evento click y
   // acabaria en el manejador de ventanas nuevas de pywebview.
@@ -823,7 +1111,9 @@
   document.addEventListener('keydown', (e) => {
     const ctrl = e.ctrlKey || e.metaKey;
     if (e.key === 'Escape') {
-      if (!$('menu').hidden) toggleMenu(false);
+      if (!$('ctxmenu').hidden) closeCtx();
+      else if (!$('tablist').hidden) $('tablist').hidden = true;
+      else if (!$('menu').hidden) toggleMenu(false);
       else if (!$('findbar').hidden) closeFind();
       else if (!$('dialog').hidden) $('dlg-cancel').click();
       return;
@@ -906,6 +1196,9 @@
     window.focus();
   };
 
+  /** Abrir una pestaña vacía. Lo usa la prueba automática. */
+  window.__newTabForTest = () => newTab(false);
+
   /** Guardar una pestaña por nombre. Lo usa la prueba automática. */
   window.__saveByName = (name) => {
     for (const tab of tabs.values()) {
@@ -935,6 +1228,7 @@
     settings.defaultSplit = !!s.split;
     setTheme(s.theme === 'light' ? 'light' : 'dark');
     setFontSize(parseInt(s.font_size, 10) || 16);
+    setTypeface(s.face);
     setToc(!!s.toc);
     const tab = addTab(info.doc, true);
     applyMode(tab, false);

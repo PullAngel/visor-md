@@ -121,9 +121,14 @@ def wait_until(window, expression, timeout=25):
 
 
 def wait_ready(window, timeout=25):
-    """Esperar a que la interfaz termine de arrancar y de dibujar los diagramas."""
+    """Esperar a que la interfaz arranque, se dibuje y termine los diagramas.
+
+    Una ventana recién mostrada tarda un instante en tener medidas: sin
+    esperarlas, cualquier comprobación de scroll o de tamaño lee ceros.
+    """
     if not wait_until(window, "window.appReady === true", timeout):
         return False
+    wait_until(window, "document.getElementById('preview').clientHeight > 0", 10)
     wait_until(window, "document.querySelectorAll('.mermaid-block').length === 0"
                        " || document.querySelector('.mermaid-block svg, .mermaid-error')"
                        " !== null", 20)
@@ -175,6 +180,9 @@ ESTRES = """({
   imagenLocal: [...document.querySelectorAll('#preview img')]
         .some((i) => i.naturalWidth > 0),
   imagenRemotaBloqueada: document.querySelectorAll('#preview img[data-blocked]').length,
+  alertas: [...document.querySelectorAll('#preview .alert-title')].map((t) => t.textContent),
+  citaNormal: document.querySelectorAll('#preview blockquote:not(.alert)').length,
+  marcadorAlerta: document.getElementById('preview').textContent.includes('[!NOTE]'),
   overlayContenido: (() => {
     const o = document.getElementById('overlay-hostil');
     if (!o) return 'sin capa de prueba';
@@ -189,7 +197,7 @@ def check_estres():
     """Los 26 casos raros de tests/estres.md, incluida la sanitización."""
     api = new_api(str(ROOT / "tests" / "estres.md"))
     w = webview.create_window("Smoke estrés", url=str(main.resource("web", "index.html")),
-                              js_api=api, width=1200, height=820, hidden=True)
+                              js_api=api, width=1200, height=820, hidden=True, text_select=True)
     api.attach(w)
     api._shown = True      # ventana de prueba: no mostrarla
     api._force_close = True  # cerrar sin preguntar por cambios sin guardar
@@ -237,6 +245,12 @@ def check_estres():
               r["imagenRemotaBloqueada"])
         check("el documento no puede cubrir la barra", r["overlayContenido"] == "confinada",
               r["overlayContenido"])
+        check("las 5 alertas de GitHub se renderizan",
+              r["alertas"] == ["Nota", "Sugerencia", "Importante", "Advertencia", "Precaución"],
+              ", ".join(r["alertas"]))
+        check("el marcador [!NOTE] no queda a la vista", not r["marcadorAlerta"])
+        check("una cita sin marcador sigue siendo cita",
+              r["citaNormal"] >= 2, r["citaNormal"])
 
         # Repetir el render (como pasa varias veces al cambiar de pestaña o
         # de tema) no debe ir dejando restos de Mermaid sueltos en <body>.
@@ -260,7 +274,7 @@ def check_txt():
     txt.write_text("Lista del super\n\n- pan\n- cafe\n", encoding="utf-8")
     api = new_api(str(txt))
     w = webview.create_window("Smoke .txt", url=str(main.resource("web", "index.html")),
-                              js_api=api, width=900, height=600, hidden=True)
+                              js_api=api, width=900, height=600, hidden=True, text_select=True)
     api.attach(w)
     api._shown = True      # ventana de prueba: no mostrarla
     api._force_close = True  # cerrar sin preguntar por cambios sin guardar
@@ -288,7 +302,7 @@ def check_tabs():
     """Varias pestañas en una sola ventana: abrir, cambiar, marcar sucia y cerrar."""
     api = new_api(str(SAMPLE))
     w = webview.create_window("Smoke pestañas", url=str(main.resource("web", "index.html")),
-                              js_api=api, width=1100, height=780, hidden=True)
+                              js_api=api, width=1100, height=780, hidden=True, text_select=True)
     api.attach(w)
     api._shown = True
     api._force_close = True
@@ -388,13 +402,134 @@ def check_tabs():
         w.destroy()
 
 
+def check_menu_contextual(w):
+    """Menú del clic derecho. Necesita una ventana visible: una oculta no
+    mantiene la selección de texto del documento."""
+    ctx = w.evaluate_js("""(() => {
+      const p = document.querySelector('#preview p');
+      const r = document.createRange();
+      r.selectNodeContents(p);
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      const box = p.getBoundingClientRect();
+      p.dispatchEvent(new MouseEvent('contextmenu', {bubbles: true,
+        clientX: box.left + 40, clientY: box.top + 6}));
+      return {
+        visible: !document.getElementById('ctxmenu').hidden,
+        seleccion: String(getSelection()).trim().slice(0, 30),
+        items: [...document.querySelectorAll('#ctxmenu button span')].map((x) => x.textContent),
+      };
+    })()""")
+    check("el clic derecho abre un menú", ctx["visible"])
+    check("con texto seleccionado ofrece copiar",
+          any(i == "Copiar" for i in ctx["items"]),
+          f'selección {ctx["seleccion"]!r}: ' + ", ".join(ctx["items"]))
+    check("y ofrece buscar la selección",
+          any(i.startswith("Buscar") for i in ctx["items"]))
+
+    ctx2 = w.evaluate_js("""(() => {
+      getSelection().removeAllRanges();
+      const b = document.querySelector('.codeblock code');
+      const box = b.getBoundingClientRect();
+      b.dispatchEvent(new MouseEvent('contextmenu', {bubbles: true,
+        clientX: box.left + 10, clientY: box.top + 6}));
+      return [...document.querySelectorAll('#ctxmenu button span')].map((x) => x.textContent);
+    })()""")
+    check("sobre un bloque de código ofrece copiarlo",
+          any("bloque de código" in i for i in ctx2), ", ".join(ctx2))
+    w.evaluate_js("document.getElementById('ctxmenu').hidden = true")
+
+
+def check_interfaz():
+    """Desbordamiento de la barra de pestañas y su selector."""
+    api = new_api(str(ROOT / "tests" / "muestra.md"))
+    w = webview.create_window("Smoke interfaz", url=str(main.resource("web", "index.html")),
+                              js_api=api, width=900, height=620, hidden=True,
+                              frameless=True, easy_drag=False, text_select=True)
+    api.attach(w)
+    api._force_close = True
+    try:
+        if not wait_ready(w):
+            check("la ventana de interfaz arranca", False)
+            return
+
+        # El selector aparece solo cuando las pestañas ya no entran.
+        antes = w.evaluate_js("!document.getElementById('btn-tablist').hidden")
+        for _ in range(14):
+            w.evaluate_js("window.__newTabForTest && window.__newTabForTest()")
+        wait_until(w, "document.querySelectorAll('.tab').length >= 12", 10)
+        time.sleep(0.5)
+        despues = w.evaluate_js("!document.getElementById('btn-tablist').hidden")
+        check("sin desbordar, no aparece el selector de pestañas", not antes)
+        check("con muchas pestañas aparece el selector", despues)
+        lista = w.evaluate_js("""(() => {
+          document.getElementById('btn-tablist').click();
+          return document.querySelectorAll('#tablist button').length;
+        })()""")
+        check("el selector lista todas las pestañas abiertas", lista >= 12, lista)
+        w.evaluate_js("document.getElementById('tablist').hidden = true")
+    finally:
+        w.destroy()
+
+
+def check_scroll_y_borrador(w):
+    """El punto de lectura se conserva al cambiar de modo y el borrador se nombra solo.
+
+    Va sobre la ventana principal: medir scroll necesita una ventana dibujada.
+    """
+    largo = Path(tempfile.mkdtemp(prefix="visormd-scroll-")) / "largo.md"
+    largo.write_text("# Documento largo\n\n" + "\n\n".join(
+        f"## Sección {i}\n\nTexto de relleno de la sección {i}." for i in range(1, 60)),
+        encoding="utf-8")
+    w.evaluate_js(f"window.__openExternalTab({json.dumps(str(largo))})")
+    wait_until(w, "(document.querySelector('.tab.active .tab-name')||{}).textContent"
+                  " === 'largo.md'", 10)
+    wait_until(w, "document.getElementById('preview').scrollHeight >"
+                  " document.getElementById('preview').clientHeight", 10)
+
+    antes = w.evaluate_js("""(() => {
+      const p = document.getElementById('preview');
+      p.scrollTop = (p.scrollHeight - p.clientHeight) * 0.5;
+      return { alto: p.scrollHeight, visible: p.clientHeight, top: p.scrollTop };
+    })()""")
+    time.sleep(0.4)
+    check("la vista de lectura tiene scroll", antes["top"] > 0, str(antes))
+    w.evaluate_js("document.getElementById('mode-edit').click()")
+    time.sleep(0.8)
+    pos = w.evaluate_js("""(() => {
+      const e = document.getElementById('editor');
+      const max = e.scrollHeight - e.clientHeight;
+      return { ratio: max > 0 ? e.scrollTop / max : 0, cursor: e.selectionStart,
+               total: e.value.length };
+    })()""")
+    check("al pasar a edición se conserva el punto de lectura",
+          0.25 <= pos["ratio"] <= 0.75, f'proporción {pos["ratio"]:.2f}')
+    check("el cursor acompaña al punto de lectura",
+          0 < pos["cursor"] < pos["total"], f'{pos["cursor"]} de {pos["total"]}')
+
+    # Una pestaña nueva toma su nombre del contenido.
+    w.evaluate_js("window.__newTabForTest && window.__newTabForTest()")
+    time.sleep(0.5)
+    w.evaluate_js("""(() => {
+      const ta = document.getElementById('editor');
+      ta.focus();
+      document.execCommand('insertText', false, '# Notas de la reunión\\n\\ntexto');
+    })()""")
+    wait_until(w, "document.querySelector('.tab.active .tab-name').textContent"
+                  " !== 'Sin título'", 5)
+    nombre = w.evaluate_js("document.querySelector('.tab.active .tab-name').textContent")
+    check("la pestaña sin guardar se nombra por su contenido",
+          nombre == "Notas de la reunión", nombre)
+    check("y se distingue de un archivo real",
+          w.evaluate_js("!!document.querySelector('.tab.active.draft')"))
+
+
 def check_close_dialog():
     """Cerrar con cambios sin guardar avisa con el diálogo propio, no con el de Windows."""
     doc = Path(tempfile.mkdtemp(prefix="visormd-cierre-")) / "pendiente.md"
     doc.write_text("# Sin guardar\n", encoding="utf-8")
     api = new_api(str(doc))
     w = webview.create_window("Smoke cierre", url=str(main.resource("web", "index.html")),
-                              js_api=api, width=900, height=600, hidden=True)
+                              js_api=api, width=900, height=600, hidden=True, text_select=True)
     api.attach(w)
     api._shown = True
     cerrada = threading.Event()
@@ -468,6 +603,15 @@ def run_checks(window):
         print("\n--- Pestañas ---")
         check_tabs()
 
+        print("\n--- Menú del clic derecho ---")
+        check_menu_contextual(window)
+
+        print("\n--- Barra de pestañas ---")
+        check_interfaz()
+
+        print("\n--- Scroll entre modos y borradores ---")
+        check_scroll_y_borrador(window)
+
         print("\n--- Aviso de cierre ---")
         check_close_dialog()
 
@@ -492,7 +636,8 @@ def run():
     main.CONFIG = Path(tempfile.mkdtemp(prefix="visormd-test-")) / "settings.json"
     api = new_api(str(SAMPLE))
     window = webview.create_window("Smoke test", url=str(main.resource("web", "index.html")),
-                                   js_api=api, width=1200, height=820)
+                                   js_api=api, width=1200, height=820, text_select=True,
+                                   frameless=True, easy_drag=False)
     api.attach(window)
     api._force_close = True  # cerrar sin preguntar por cambios sin guardar
     threading.Thread(target=run_checks, args=(window,), daemon=True).start()

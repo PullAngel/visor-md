@@ -21,12 +21,25 @@
   <symbol id="i-up" viewBox="0 0 24 24"><path d="m6 14 6-6 6 6"/></symbol>
   <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 10 6 6 6-6"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-min" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-max" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1"/></symbol>
+  <symbol id="i-restore" viewBox="0 0 24 24"><rect x="4" y="8" width="12" height="12" rx="1"/><path d="M8 8V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3"/></symbol>
 </svg>
 
 <div id="tabbar" role="tablist" aria-label="Documentos abiertos">
   <div id="tabs-scroll"></div>
-  <button id="btn-newtab" class="icon sm" title="Nueva pestaña (Ctrl+T)"><svg><use href="#i-plus"/></svg></button>
+  <button id="btn-newtab" class="tabbar-btn" title="Nueva pestaña (Ctrl+T)"><svg><use href="#i-plus"/></svg></button>
+  <button id="btn-tablist" class="tabbar-btn" title="Todas las pestañas" hidden><svg><use href="#i-chevron"/></svg></button>
+  <div id="drag-zone"></div>
+  <div id="winbtns">
+    <button id="win-min" title="Minimizar"><svg><use href="#i-min"/></svg></button>
+    <button id="win-max" title="Maximizar"><svg><use href="#i-max"/></svg></button>
+    <button id="win-close" title="Cerrar"><svg><use href="#i-close"/></svg></button>
+  </div>
 </div>
+
+<div id="tablist" hidden role="menu" aria-label="Pestañas abiertas"></div>
 
 <header id="toolbar">
   <div class="tools-left">
@@ -67,6 +80,7 @@
   <button data-fmt="image" title="Imagen">Imagen</button>
   <button data-fmt="fence" title="Bloque de código (Ctrl+Shift+C)">Bloque</button>
   <button data-fmt="table" title="Tabla">Tabla</button>
+  <button data-fmt="alert" title="Alerta de GitHub (nota, sugerencia, aviso)">Alerta</button>
   <button data-fmt="hr" title="Línea horizontal">Línea</button>
   <span class="grow"></span>
   <button id="btn-plain" class="ghost" hidden title="Renderizar este .txt como Markdown">Interpretar como Markdown</button>
@@ -111,6 +125,12 @@
   <div class="menu-row">
     <button data-act="font-">A−</button><span id="font-val">16 px</span><button data-act="font+">A+</button>
   </div>
+  <div class="menu-label">Tipografía</div>
+  <div class="menu-row typeface">
+    <button data-face="sans" title="Segoe UI">Sistema</button>
+    <button data-face="serif" title="Georgia">Serif</button>
+    <button data-face="mono" title="Cascadia Mono">Mono</button>
+  </div>
   <hr>
   <div class="menu-label">Recientes</div>
   <div id="recent-list"></div>
@@ -130,6 +150,8 @@
     </div>
   </div>
 </div>
+
+<div id="ctxmenu" hidden role="menu"></div>
 
 <div id="toast" hidden></div>
 

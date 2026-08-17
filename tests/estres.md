@@ -322,7 +322,28 @@ Jinja: {% for x in xs %}{{ x }}{% endfor %}.
 Shell: ${HOME} y $USER.
 Go: {{.Nombre}}.
 
-## 26. Contenido hostil
+## 26. Alertas de GitHub
+
+> [!NOTE]
+> Una nota informativa.
+
+> [!TIP]
+> Un consejo.
+
+> [!IMPORTANT]
+> Algo que no hay que perderse.
+
+> [!WARNING]
+> Una advertencia.
+
+> [!CAUTION]
+> Precaución, esto es peligroso.
+
+Una cita normal no debe convertirse en alerta:
+
+> Esto es solo una cita, sin marcador.
+
+## 27. Contenido hostil
 
 Bloque de código con texto oculto: lo que se copia debe coincidir con lo que se
 lee en pantalla.
@@ -333,7 +354,7 @@ Capa que intenta cubrir la aplicación entera:
 
 <div id="overlay-hostil" style="position:fixed;inset:0;z-index:99999">capa</div>
 
-## 27. Cierre
+## 28. Cierre
 
 Línea con espacios al final para salto forzado:  
 esta va en la línea siguiente.

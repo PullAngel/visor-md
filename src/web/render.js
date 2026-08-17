@@ -141,6 +141,35 @@ window.Render = (function () {
     });
   }
 
+  /* Alertas de GitHub: una cita que empieza por [!NOTE], [!TIP], [!IMPORTANT],
+     [!WARNING] o [!CAUTION] se muestra como aviso con color e icono. */
+  const ALERTS = {
+    NOTE: 'Nota', TIP: 'Sugerencia', IMPORTANT: 'Importante',
+    WARNING: 'Advertencia', CAUTION: 'Precaución',
+  };
+
+  function markAlerts(el) {
+    el.querySelectorAll('blockquote').forEach((quote) => {
+      const first = quote.firstElementChild;
+      if (!first || first.tagName !== 'P') return;
+      const m = first.textContent.match(/^\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*/i);
+      if (!m) return;
+      const kind = m[1].toUpperCase();
+      quote.classList.add('alert', 'alert-' + kind.toLowerCase());
+      const title = document.createElement('p');
+      title.className = 'alert-title';
+      title.textContent = ALERTS[kind];
+      // Quitar el marcador del texto, conservando el resto del párrafo.
+      first.childNodes.forEach((node) => {
+        if (node.nodeType === Node.TEXT_NODE && node.nodeValue.includes('[!')) {
+          node.nodeValue = node.nodeValue.replace(m[0], '');
+        }
+      });
+      if (!first.textContent.trim() && !first.querySelector('img, code')) first.remove();
+      quote.prepend(title);
+    });
+  }
+
   function markDoneTasks(el) {
     el.querySelectorAll('.task-list-item').forEach((li) => {
       const box = li.querySelector('input[type="checkbox"]');
@@ -260,6 +289,7 @@ window.Render = (function () {
     unhideCode(el);
     resolveImages(el, o.remoteImages, o.docId);
     addCopyButtons(el);
+    markAlerts(el);
     markDoneTasks(el);
     renderMath(el);
     return renderMermaid(el, o.theme);
