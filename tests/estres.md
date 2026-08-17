@@ -99,7 +99,10 @@ Con paréntesis en la URL: [wiki](https://es.wikipedia.org/wiki/Markdown_(lengua
 
 ## 7. Imágenes
 
-Local existente: ![icono](../assets/visormd.png)
+Local en la carpeta del documento: ![icono](icono-local.png)
+
+Local fuera de la carpeta (bloqueada hasta darle permiso):
+![icono de más arriba](../assets/visormd.png)
 
 Inexistente (debe fallar sin romper nada): ![falta](no-existe.png)
 

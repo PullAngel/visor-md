@@ -1,7 +1,18 @@
 /* Estado de la aplicación, pestañas, modos de trabajo, atajos y llamadas a Python. */
 
 (function () {
-  const $ = (id) => document.getElementById(id);
+  // Referencias de la interfaz tomadas una sola vez, con el documento todavía
+  // vacío. getElementById devuelve el primero en orden de árbol, y #preview
+  // está antes que #menu, #dialog y #ctxmenu: sin esta instantánea, un
+  // encabezado llamado "Menú" —markdown-it-anchor le pone id="menu"— o un
+  // <div id="dialog"> dentro del documento le roban la referencia a la
+  // aplicación, que pasaría a escribir y a escuchar clics en el documento.
+  const UI = new Map();
+  document.querySelectorAll('[id]').forEach((el) => {
+    if (!UI.has(el.id)) UI.set(el.id, el);
+  });
+  const $ = (id) => UI.get(id) || document.getElementById(id);
+  window.__uiRef = $;  // La suite de seguridad comprueba a qué resuelve.
   const editor = $('editor');
   const preview = $('preview');
 
@@ -57,10 +68,11 @@
   // la pestaña que estuviera esperando esa respuesta.
   let dialogQueue = Promise.resolve();
 
-  function dialog(title, bodyHtml, okText, cancelText) {
+  function dialog(title, bodyHtml, okText, cancelText, onOpen) {
     const show = () => new Promise((resolve) => {
       $('dlg-title').textContent = title;
       $('dlg-body').innerHTML = bodyHtml;
+      if (onOpen) onOpen($('dlg-body'));
       $('dlg-ok').textContent = okText || 'Aceptar';
       $('dlg-cancel').hidden = !cancelText;
       if (cancelText) $('dlg-cancel').textContent = cancelText;
@@ -150,7 +162,10 @@
       }
       Render.render(editor.value, preview, {
         theme: settings.theme,
-        remoteImages: tab.remoteImages,
+        // Un solo permiso para las imágenes que no vienen con el documento,
+        // sean remotas o locales fuera de su carpeta.
+        remoteImages: tab.remoteImages || !settings.blockRemote,
+        maxDiagrams: settings.maxDiagrams,
         docId: tab.id,
       }).then(refreshToc);
     };
@@ -236,8 +251,8 @@
     return tab;
   }
 
-  async function openIntoTab(tab, path) {
-    const res = await call('open_into', tab.id, path);
+  async function openIntoTab(tab, path, fromDocument) {
+    const res = await call('open_into', tab.id, path, !!fromDocument);
     if (!res || !res.ok) { toast((res && res.error) || 'No se pudo abrir: ' + path); return null; }
     Object.assign(tab, {
       path: res.path, name: res.name, ext: res.ext || tab.ext, text: res.text || '',
@@ -397,6 +412,8 @@
       call('save_settings', {
         theme: settings.theme, split: settings.defaultSplit,
         toc: settings.toc, font_size: settings.fontSize, face: settings.face,
+        contain_images: settings.containImages, block_remote: settings.blockRemote,
+        trusted_dirs: settings.trustedDirs, max_diagrams: settings.maxDiagrams,
       }).catch(() => {});
     }, 400);
   }
@@ -860,6 +877,89 @@
     });
   }
 
+  /* Configuración avanzada: aflojar las restricciones de acceso a recursos
+     para trabajar con documentos propios. No expone la sanitización, la CSP
+     ni los protocolos permitidos: esos separan mostrar un documento de
+     ejecutar lo que trae dentro, y no hay trabajo legítimo que los necesite
+     apagados. Ver docs/frontera-de-seguridad.md. */
+  async function advancedDialog() {
+    const trusted = (settings.trustedDirs || []).slice();
+    let campos = null;
+
+    const pintarCarpetas = (body) => {
+      const box = body.querySelector('#adv-dirs');
+      box.innerHTML = '';
+      if (!trusted.length) {
+        const p = document.createElement('p');
+        p.className = 'adv-empty';
+        p.textContent = 'Ninguna. Los documentos se tratan todos igual.';
+        box.appendChild(p);
+        return;
+      }
+      trusted.forEach((dir, i) => {
+        const row = document.createElement('div');
+        row.className = 'adv-dir';
+        const nombre = document.createElement('span');
+        nombre.textContent = dir;
+        nombre.title = dir;
+        const quitar = document.createElement('button');
+        quitar.type = 'button';
+        quitar.textContent = 'Quitar';
+        quitar.addEventListener('click', () => {
+          trusted.splice(i, 1);
+          pintarCarpetas(body);
+        });
+        row.append(nombre, quitar);
+        box.appendChild(row);
+      });
+    };
+
+    const ok = await dialog('Configuración avanzada',
+      `<p class="adv-intro">Un documento Markdown puede venir de cualquier parte, así que
+         de entrada se le da el mínimo acceso. Acá se afloja para trabajar con documentos propios.</p>
+       <label class="adv-check"><input type="checkbox" id="adv-contain">
+         Cargar solo las imágenes que estén en la carpeta del documento o por debajo</label>
+       <label class="adv-check"><input type="checkbox" id="adv-remote">
+         Bloquear las imágenes remotas hasta pedirlas</label>
+       <label class="adv-num">Máximo de diagramas por documento
+         <input type="number" id="adv-diagrams" min="1" max="500" step="1"></label>
+       <div class="menu-label">Carpetas de confianza</div>
+       <p class="adv-intro">Los documentos que estén dentro de estas carpetas cargan sus
+         imágenes sin restricción, sin cambiar el resto de los ajustes.</p>
+       <div id="adv-dirs"></div>
+       <button type="button" id="adv-add" class="adv-add">Agregar carpeta…</button>`,
+      'Guardar', 'Cancelar',
+      (body) => {
+        // Los controles se guardan acá: si otro diálogo se encola detrás,
+        // reemplaza el contenido de #dlg-body y estas referencias siguen
+        // conservando lo que el usuario eligió.
+        campos = {
+          contain: body.querySelector('#adv-contain'),
+          remote: body.querySelector('#adv-remote'),
+          diagrams: body.querySelector('#adv-diagrams'),
+        };
+        campos.contain.checked = settings.containImages;
+        campos.remote.checked = settings.blockRemote;
+        campos.diagrams.value = settings.maxDiagrams;
+        pintarCarpetas(body);
+        body.querySelector('#adv-add').addEventListener('click', async () => {
+          const dir = await call('pick_folder').catch(() => null);
+          if (dir && !trusted.includes(dir)) trusted.push(dir);
+          pintarCarpetas(body);
+        });
+      });
+    if (!ok || !campos) return;
+
+    settings.containImages = campos.contain.checked;
+    settings.blockRemote = campos.remote.checked;
+    settings.maxDiagrams = Math.min(500, Math.max(1,
+      parseInt(campos.diagrams.value, 10) || 50));
+    settings.trustedDirs = trusted;
+    persist();
+    rerender(true);
+    toast('Configuración guardada');
+  }
+
   const MENU_ACTIONS = {
     newtab: () => newTab(),
     newwindow: () => call('new_window').catch(() => {}),
@@ -888,8 +988,9 @@
       if (!tab) return;
       tab.remoteImages = !tab.remoteImages;
       rerender(true);
-      toast(tab.remoteImages ? 'Imágenes remotas activadas' : 'Imágenes remotas bloqueadas');
+      toast(tab.remoteImages ? 'Imágenes bloqueadas cargadas' : 'Imágenes bloqueadas otra vez');
     },
+    advanced: () => advancedDialog(),
     export: async () => {
       const tab = active();
       if (!tab) return;
@@ -1129,7 +1230,8 @@
       const tab = active();
       if (!tab) return;
       if (!await confirmDiscard(tab)) return;
-      await openIntoTab(tab, href);
+      // La ruta la propone el documento: Python la filtra en consecuencia.
+      await openIntoTab(tab, href, true);
     }
   });
 
@@ -1253,6 +1355,13 @@
     const s = info.settings || {};
     settings.ready = false;
     settings.defaultSplit = !!s.split;
+    // Configuración avanzada. Ante un ajuste ausente o corrupto se toma el
+    // valor restrictivo: un settings.json a medio escribir no debe terminar
+    // en menos restricciones de las que el usuario eligió.
+    settings.containImages = s.contain_images !== false;
+    settings.blockRemote = s.block_remote !== false;
+    settings.trustedDirs = Array.isArray(s.trusted_dirs) ? s.trusted_dirs : [];
+    settings.maxDiagrams = parseInt(s.max_diagrams, 10) || 50;
     setTheme(s.theme === 'light' ? 'light' : 'dark');
     setFontSize(parseInt(s.font_size, 10) || 16);
     setTypeface(s.face);

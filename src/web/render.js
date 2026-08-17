@@ -56,13 +56,43 @@ window.Render = (function () {
   md.renderer.rules.table_close = (t, i, o, e, s) => (
     (closeTable ? closeTable(t, i, o, e, s) : '</table>') + '</div>');
 
+  /* Protocolos admitidos en cualquier URL del documento. Es una allowlist
+     explícita en vez de la de DOMPurify, que además de estos acepta tel:,
+     sms:, cid:, xmpp: y ftp:, que esta aplicación no usa. La alternativa
+     final cubre las rutas relativas y las anclas, necesarias para las
+     imágenes locales, los enlaces entre documentos y el índice. */
+  const ALLOWED_URI = /^(?:https?:|mailto:|[#./?]|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i;
+
   /* Sanitiza el HTML generado antes de insertarlo: quita script, on*= y
      href=javascript:. style y form se prohiben aparte por ser globales. */
   const clean = (html) => (window.DOMPurify
     ? DOMPurify.sanitize(html, {
         ADD_ATTR: ['target', 'checked', 'disabled', 'id', 'open'],
-        FORBID_TAGS: ['style', 'form'],
-        FORBID_ATTR: ['autofocus'],
+        // Además de style y form, que son globales, se descartan los
+        // elementos que traen un recurso externo por su cuenta: video, audio,
+        // source, track y las imágenes de un SVG en línea piden la URL apenas
+        // entran al DOM, antes de que ningún código pueda intervenir, y con
+        // eso delatan la lectura del documento. No aportan nada al formato.
+        FORBID_TAGS: ['style', 'form', 'video', 'audio', 'source', 'track',
+                      'image', 'use'],
+        FORBID_ATTR: ['autofocus', 'srcset', 'imagesrcset', 'ping', 'poster'],
+        ALLOWED_URI_REGEXP: ALLOWED_URI,
+      })
+    : '');
+
+  /* Segunda pasada para el SVG que genera Mermaid, que no atraviesa clean():
+     lo entrega ya armado y se inserta con innerHTML. Mermaid sanea sus
+     etiquetas por dentro, pero esta es la única vía por la que algo derivado
+     del documento llega al DOM sin pasar por la frontera de la aplicación.
+     Conserva <style>, que Mermaid acota con el id del diagrama y de donde
+     sale todo el color; descarta foreignObject, la puerta de vuelta a HTML
+     dentro de un SVG. */
+  const cleanSvg = (svg) => (window.DOMPurify
+    ? DOMPurify.sanitize(svg, {
+        USE_PROFILES: { svg: true, svgFilters: true, html: true },
+        ADD_TAGS: ['style'],
+        FORBID_TAGS: ['foreignObject', 'script', 'form'],
+        ALLOWED_URI_REGEXP: ALLOWED_URI,
       })
     : '');
 
@@ -81,23 +111,50 @@ window.Render = (function () {
      delata la IP y confirma la lectura del archivo. Las locales las entrega
      Python en base64, porque la interfaz corre sobre http://127.0.0.1 y
      Chromium no permite subrecursos file:// desde ese origen. */
-  function resolveImages(el, allowRemote, docId) {
+  const MOTIVOS = {
+    fuera: 'Imagen fuera de la carpeta del documento. Menú > Cargar imágenes bloqueadas.',
+    red: 'Imagen en una ubicación de red: bloqueada siempre.',
+    tipo: 'El archivo no es una imagen.',
+    'tamaño': 'La imagen supera el tamaño máximo.',
+    falta: 'No se encontró la imagen: ',
+  };
+
+  /* Quitar los recursos que trae un atributo style del documento.
+     `background-image: url(...)` sale a la red apenas el elemento entra al
+     DOM. Una ruta local tampoco funcionaría acá, porque la página vive en
+     http://127.0.0.1 y no puede pedir subrecursos del disco, así que quitar
+     la función url() no le saca nada al documento que hoy sirva. */
+  function stripStyleUrls(el) {
+    el.querySelectorAll('[style]').forEach((n) => {
+      const css = n.getAttribute('style') || '';
+      if (!/url\s*\(/i.test(css)) return;
+      const limpio = css.replace(/url\s*\([^)]*\)/gi, 'none');
+      if (limpio.trim()) n.setAttribute('style', limpio);
+      else n.removeAttribute('style');
+    });
+  }
+
+  function resolveImages(el, allowExternal, docId) {
     const api = window.pywebview && window.pywebview.api;
     el.querySelectorAll('img[src]').forEach((img) => {
       const src = img.getAttribute('src');
       if (src.startsWith('data:')) return;
       if (isRemote(src)) {
-        if (allowRemote) return;
+        if (allowExternal) return;
         img.removeAttribute('src');
         img.dataset.blocked = src;
-        img.alt = 'Imagen remota bloqueada. Menu > Cargar imágenes remotas.';
+        img.alt = 'Imagen remota bloqueada. Menú > Cargar imágenes bloqueadas.';
         return;
       }
       if (!api || !api.image_data || !docId) return;
       img.removeAttribute('src');
-      api.image_data(docId, src).then((uri) => {
-        if (uri) img.src = uri;
-        else img.alt = 'No se encontró la imagen: ' + src;
+      // Una imagen local fuera de la carpeta del documento se trata igual que
+      // una remota: se bloquea con aviso y el mismo permiso la carga.
+      api.image_data(docId, src, !!allowExternal).then((res) => {
+        if (res && res.ok) { img.src = res.uri; return; }
+        const motivo = (res && res.reason) || 'falta';
+        if (motivo === 'fuera' && !allowExternal) img.dataset.blocked = src;
+        img.alt = (MOTIVOS[motivo] || MOTIVOS.falta) + (motivo === 'falta' ? src : '');
       }).catch(() => {});
     });
   }
@@ -207,6 +264,15 @@ window.Render = (function () {
         ],
         ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code', 'option'],
         throwOnError: false,
+        // trust queda en false, su valor por defecto: sin él, \href, \url y
+        // \includegraphics quedan desactivados y una fórmula no puede navegar
+        // ni cargar recursos.
+        //
+        // maxSize acota \rule y \kern, que sin techo aceptan tamaños como
+        // 99999em y dejan la página inutilizable. 50em son unas cuarenta veces
+        // el ancho de una línea: ninguna fórmula real se acerca.
+        maxSize: 50,
+        maxExpand: 1000,
       });
     } catch (e) { /* Fórmula inválida: conservar el texto original. */ }
   }
@@ -228,9 +294,22 @@ window.Render = (function () {
   }
 
   let mermaidSeq = 0;
-  async function renderMermaid(el, theme) {
-    const blocks = el.querySelectorAll('.mermaid-block:has(.mermaid-src)');
-    if (!blocks.length) return;
+  async function renderMermaid(el, theme, maxDiagrams) {
+    const todos = el.querySelectorAll('.mermaid-block:has(.mermaid-src)');
+    if (!todos.length) return;
+    // Cada diagrama mide su propio SVG en el DOM, así que el coste crece con
+    // la cantidad. Pasado el tope queda a la vista el código fuente, que es lo
+    // que ya se muestra cuando mermaid no está disponible.
+    const tope = maxDiagrams > 0 ? maxDiagrams : 50;
+    const blocks = Array.from(todos).slice(0, tope);
+    if (todos.length > tope) {
+      for (const extra of Array.from(todos).slice(tope)) {
+        const aviso = document.createElement('div');
+        aviso.className = 'mermaid-error';
+        aviso.textContent = `El documento supera los ${tope} diagramas; este no se dibujó.`;
+        extra.prepend(aviso);
+      }
+    }
     let mermaid;
     try {
       mermaid = await loadMermaid();
@@ -256,7 +335,7 @@ window.Render = (function () {
       document.body.appendChild(scratch);
       try {
         const { svg } = await mermaid.render('mmd-' + (++mermaidSeq), src, scratch);
-        block.innerHTML = svg;
+        block.innerHTML = cleanSvg(svg);
       } catch (e) {
         block.innerHTML = '<div class="mermaid-error">Diagrama Mermaid inválido: '
           + esc(String(e && e.message ? e.message : e)) + '</div>';
@@ -286,13 +365,17 @@ window.Render = (function () {
   function render(text, el, opts) {
     const o = opts || {};
     el.innerHTML = clean(md.render(stripFrontMatter(text || '')));
-    unhideCode(el);
+    // Estas dos van antes que nada y sin esperar a nadie: el navegador pide
+    // los recursos del HTML recién insertado en cuanto termina este bloque de
+    // código, así que lo que no se quite ahora ya salió a la red.
+    stripStyleUrls(el);
     resolveImages(el, o.remoteImages, o.docId);
+    unhideCode(el);
     addCopyButtons(el);
     markAlerts(el);
     markDoneTasks(el);
     renderMath(el);
-    return renderMermaid(el, o.theme);
+    return renderMermaid(el, o.theme, o.maxDiagrams);
   }
 
   /** Mostrar texto plano sin interpretar. */

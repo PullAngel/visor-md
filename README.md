@@ -124,8 +124,11 @@ igual que en GitHub.
   y un botón despliega la lista completa para saltar a cualquiera.
 - **Archivos recientes** y detección de cambios hechos por otro programa
   mientras el documento está abierto.
-- **Imágenes remotas bloqueadas por defecto**: solo se cargan si el usuario
-  lo pide desde el menú, para no filtrar la IP al abrir un documento ajeno.
+- **Imágenes bloqueadas por defecto** si no vinieron con el documento: las
+  remotas, para no filtrar la IP al abrir un archivo ajeno, y las locales que
+  estén fuera de su carpeta. Un clic en el menú las carga.
+- **Configuración avanzada** para aflojar esas restricciones y marcar carpetas
+  de confianza, cuyos documentos se abren sin límites de imágenes.
 - Tema **nocturno** y **diurno**, y tamaño de letra ajustable.
 
 ---
@@ -212,40 +215,60 @@ y en `F11`.
 ### Seguridad
 
 Un documento Markdown puede provenir de cualquier origen, así que se trata
-como contenido no confiable:
+como contenido hostil hasta que se demuestre lo contrario. El detalle de cada
+frontera está en
+[`docs/frontera-de-seguridad.md`](docs/frontera-de-seguridad.md); en resumen:
 
-- Todo el HTML generado pasa por DOMPurify. Se eliminan `<script>`, los
-  atributos `on*=` y los enlaces `javascript:`, `data:`, `file:` y
-  `ms-msdt:`.
-- `<style>` y `<form>` se prohíben aparte por su alcance global dentro de la
-  página.
+- Todo el HTML generado pasa por DOMPurify, con allowlist explícita de
+  protocolos: `http`, `https`, `mailto` y rutas relativas. `<style>`,
+  `<form>` y los elementos que piden un recurso externo por su cuenta se
+  descartan aparte.
+- Una CSP respalda la sanitización desde el navegador y cubre lo que esta no
+  mira, como un `@import` dentro de un `<style>` generado.
+- Las rutas que propone el documento se validan **canonizadas**, no como
+  texto, de modo que la comprobación recae sobre el archivo que se va a abrir
+  y no sobre el nombre que lo pedía. Las rutas de red se rechazan siempre:
+  resolver una UNC hace que Windows entregue credenciales sin mediar un clic.
+- Abrir un documento no genera ninguna petición remota, por ninguna vía:
+  imagen, `srcset`, SVG, CSS, medios incrustados, diagrama o fórmula.
 - El panel del documento usa `contain: paint`, de modo que un elemento
-  posicionado dentro del Markdown no puede cubrir la barra de herramientas.
+  posicionado dentro del Markdown no puede cubrir la barra de herramientas,
+  y las referencias de la interfaz se fijan al arrancar para que un `id` del
+  documento no pueda suplantarlas.
 - Los bloques de código pierden los atributos `style` y `hidden`: lo que se
   copia siempre coincide con lo que se ve.
-- Los enlaces del documento no navegan dentro de la aplicación. Solo
-  `http`, `https` y `mailto` se abren en el navegador del sistema; el clic
-  central se intercepta igual que el clic normal.
-- Las imágenes remotas están bloqueadas por defecto. Las locales las
-  entrega Python en base64, tras comprobar extensión y tamaño.
-- KaTeX corre con `trust: false` y Mermaid con `securityLevel: 'strict'`.
+- El SVG que genera Mermaid vuelve a sanearse antes de entrar en la página,
+  porque era la única vía que no atravesaba la sanitización general. KaTeX
+  corre con `trust: false` y con tope de tamaño y de expansión de macros.
+- El frontmatter se descarta con una expresión regular: no hay ningún
+  analizador de YAML al que atacar.
 - El registro de Windows se modifica solo en `HKCU` y solo a pedido
   explícito del usuario. Los procesos auxiliares se invocan por ruta
   absoluta, no por nombre.
 
+Lo que se puede aflojar desde la configuración avanzada es **a qué recursos
+accede** un documento. Lo que nunca se puede aflojar es **qué puede
+ejecutar**.
+
 ### Pruebas
 
-Dos suites, sin frameworks de por medio:
+Tres suites, sin frameworks de por medio:
 
 - `tests/test_files.py` — lectura y escritura en disco: codificaciones,
   BOM, fin de línea, guardado atómico, detección de cambios externos y
   movimiento de una pestaña entre ventanas.
 - `tests/smoke.py` — abre la aplicación real (no un mock) y verifica el
   render contra `tests/estres.md`, un documento armado con casos límite de
-  Markdown y contenido deliberadamente hostil (scripts inyectados, enlaces
-  `javascript:`, bloques de código con texto oculto) para confirmar que la
-  sanitización efectivamente los neutraliza. Cubre también pestañas,
-  arrastre entre ventanas y el diálogo de cierre.
+  Markdown. Cubre también pestañas, arrastre entre ventanas, menú
+  contextual y el diálogo de cierre.
+- `tests/seguridad.py` — abre el corpus hostil de `tests/security/` y afirma
+  propiedades, no ausencia de fallos: que no queda ningún atributo `on*`, que
+  no salió una sola petición a la red, que ninguna ruta escapó de la carpeta
+  del documento. Los payloads son datos de prueba: la suite mira en qué
+  quedaron convertidos, nunca los ejecuta.
+
+Encontró tres fallos reales durante su primera ejecución, entre ellos que
+`srcset`, los SVG en línea y `background-image` seguían saliendo a la red.
 
 El arrastre entre ventanas se verificó además moviendo el cursor del
 sistema operativo de verdad, no con eventos simulados.
@@ -253,6 +276,7 @@ sistema operativo de verdad, no con eventos simulados.
 ```powershell
 python tests\test_files.py
 python tests\smoke.py
+python tests\seguridad.py
 ```
 
 ### Paleta

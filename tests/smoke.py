@@ -181,6 +181,8 @@ ESTRES = """({
   imagenLocal: [...document.querySelectorAll('#preview img')]
         .some((i) => i.naturalWidth > 0),
   imagenRemotaBloqueada: document.querySelectorAll('#preview img[data-blocked]').length,
+  imagenDeMasArriba: [...document.querySelectorAll('#preview img[data-blocked]')]
+        .some((i) => i.dataset.blocked.includes('assets')),
   alertas: [...document.querySelectorAll('#preview .alert-title')].map((t) => t.textContent),
   citaNormal: document.querySelectorAll('#preview blockquote:not(.alert)').length,
   marcadorAlerta: document.getElementById('preview').textContent.includes('[!NOTE]'),
@@ -241,7 +243,9 @@ def check_estres():
         check("se copia exactamente lo que se ve",
               r["copiaOculta"] == 0 and r["estilosEnCodigo"] == 0,
               f'{r["copiaOculta"]} bloques distintos, {r["estilosEnCodigo"]} con estilo')
-        check("las imágenes locales cargan", r["imagenLocal"])
+        check("las imágenes de la carpeta del documento cargan", r["imagenLocal"])
+        check("una imagen local de más arriba queda bloqueada hasta darle permiso",
+              r["imagenDeMasArriba"])
         check("las imágenes remotas quedan bloqueadas", r["imagenRemotaBloqueada"] >= 1,
               r["imagenRemotaBloqueada"])
         check("el documento no puede cubrir la barra", r["overlayContenido"] == "confinada",

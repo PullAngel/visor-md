@@ -579,6 +579,9 @@ body[data-split="on"] #editor { border-right: 1px solid var(--border); }
   min-width: 262px; padding: 6px;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: 12px; box-shadow: var(--shadow);
+  /* En una pantalla de 768 px el menú no entra entero: sin esto, los últimos
+     elementos quedan por debajo del borde y no hay forma de alcanzarlos. */
+  max-height: calc(100vh - 70px); overflow-y: auto; overscroll-behavior: contain;
 }
 #menu button {
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
@@ -642,6 +645,38 @@ body[data-split="on"] #editor { border-right: 1px solid var(--border); }
 #dlg-body ol { padding-left: 20px; margin: 10px 0 0; }
 #dlg-body strong { color: var(--text); }
 .dlg-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+
+/* Configuración avanzada */
+.adv-intro { margin: 0 0 12px; font-size: 13px; }
+.adv-check {
+  display: flex; gap: 9px; align-items: flex-start;
+  margin-bottom: 10px; cursor: pointer; color: var(--text);
+}
+.adv-check input { margin-top: 3px; accent-color: var(--accent); flex: none; }
+.adv-num { display: flex; align-items: center; gap: 10px; color: var(--text); }
+.adv-num input {
+  width: 76px; padding: 5px 8px; font: inherit;
+  color: var(--text); background: var(--bg);
+  border: 1px solid var(--border); border-radius: 7px;
+}
+#dlg-body .menu-label { margin: 18px 0 4px; }
+#adv-dirs { display: grid; gap: 6px; margin-bottom: 10px; }
+.adv-empty { margin: 0; font-size: 13px; font-style: italic; }
+.adv-dir {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px;
+}
+.adv-dir span {
+  flex: 1; min-width: 0; font-size: 13px; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  direction: rtl; text-align: left;  /* Recorta por el principio de la ruta. */
+}
+.adv-dir button, .adv-add {
+  padding: 5px 10px; font: inherit; font-size: 13px; cursor: pointer;
+  color: var(--text); background: var(--bg);
+  border: 1px solid var(--border); border-radius: 7px;
+}
+.adv-dir button:hover, .adv-add:hover { border-color: var(--accent); }
 
 #toast {
   position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);

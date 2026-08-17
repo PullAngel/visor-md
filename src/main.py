@@ -48,8 +48,13 @@ VERSION = "1.0.0"
 DARK_BG = "#061401"
 CONFIG = Path(os.environ.get("APPDATA", Path.home())) / "VisorMD" / "settings.json"
 WEBVIEW_PROFILE = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "VisorMD" / "WebView2"
-DEFAULTS = {"theme": "dark", "mode": "read", "split": False, "toc": False,
-            "width": 1100, "height": 780, "font_size": 16, "recent": []}
+DEFAULTS = {"theme": "dark", "split": False, "toc": False,
+            "width": 1100, "height": 780, "font_size": 16, "recent": [],
+            # Configuración avanzada. Los valores estrictos son el punto de
+            # partida; se aflojan desde el menú para trabajar con fuentes
+            # propias. Ver docs/frontera-de-seguridad.md.
+            "contain_images": True, "block_remote": True,
+            "trusted_dirs": [], "max_diagrams": 50}
 
 IMAGE_TYPES = {
     ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
@@ -163,13 +168,6 @@ class _MONITORINFO(ctypes.Structure):
                 ("rcWork", _RECT), ("dwFlags", ctypes.c_ulong)]
 
 
-_WNDPROC = ctypes.WINFUNCTYPE(ctypes.c_longlong, ctypes.c_void_p, ctypes.c_uint,
-                              ctypes.c_void_p, ctypes.c_void_p)
-# Los procedimientos instalados se guardan para que el recolector de basura no
-# se lleve el puntero que Windows todavía tiene registrado.
-_wndprocs: dict[int, tuple] = {}
-
-
 def monitor_work_area(hwnd: int) -> tuple[_RECT, _RECT] | None:
     """Área del monitor de la ventana: la completa y la libre de barras."""
     user32 = ctypes.windll.user32
@@ -183,43 +181,107 @@ def monitor_work_area(hwnd: int) -> tuple[_RECT, _RECT] | None:
     return info.rcMonitor, info.rcWork
 
 
-def clamp_maximize_to_work_area(hwnd: int) -> None:
+def clamp_maximize_to_work_area(window) -> None:
     """Impedir que la ventana maximizada tape la barra de tareas.
 
     Una ventana sin marco maximizada ocupa el monitor entero, porque Windows
-    calcula ese tamaño a partir de un borde que aquí no existe. Interceptar
-    WM_GETMINMAXINFO corrige el cálculo para todas las vías de maximizar: el
-    botón propio, Win+Flecha arriba y el acople al borde superior.
+    calcula ese tamaño a partir de un borde que aquí no existe.
+
+    La corrección va por `MaximizedBounds`, la propiedad con la que WinForms
+    acota el maximizado, y no interceptando WM_GETMINMAXINFO por debajo: al
+    responder ese mensaje sin pasar por WinForms, el formulario se queda con
+    las medidas anteriores y el control de WebView2 no se reajusta, así que la
+    ventana crece pero el contenido no. Vale además para todas las vías de
+    maximizar, incluidas Win+Flecha arriba y el acople al borde superior.
     """
-    if not hwnd or hwnd in _wndprocs:
+    try:
+        form = window.native
+        hwnd = form.Handle.ToInt64()
+    except Exception:
         return
-    user32 = ctypes.windll.user32
-    user32.SetWindowLongPtrW.restype = ctypes.c_longlong
-    user32.GetWindowLongPtrW.restype = ctypes.c_longlong
-    user32.CallWindowProcW.restype = ctypes.c_longlong
+    areas = monitor_work_area(hwnd)
+    if not areas:
+        return
+    libre = areas[1]
+    try:
+        from System.Drawing import Rectangle  # noqa: PLC0415  (necesita pythonnet cargado)
+        form.MaximizedBounds = Rectangle(
+            libre.left, libre.top, libre.right - libre.left, libre.bottom - libre.top)
+    except Exception:
+        pass
 
-    anterior = user32.GetWindowLongPtrW(hwnd, -4)  # GWL_WNDPROC
 
-    def proc(h, msg, wparam, lparam):
-        if msg == 0x0024 and lparam:  # WM_GETMINMAXINFO
-            areas = monitor_work_area(hwnd)
-            if areas:
-                pantalla, libre = areas
-                mmi = ctypes.cast(lparam, ctypes.POINTER(_MINMAXINFO)).contents
-                mmi.ptMaxPosition.x = libre.left - pantalla.left
-                mmi.ptMaxPosition.y = libre.top - pantalla.top
-                mmi.ptMaxSize.x = libre.right - libre.left
-                mmi.ptMaxSize.y = libre.bottom - libre.top
-                # Sin este par, el usuario no puede agrandar a mano más allá
-                # del tamaño maximizado.
-                mmi.ptMaxTrackSize.x = pantalla.right - pantalla.left
-                mmi.ptMaxTrackSize.y = pantalla.bottom - pantalla.top
-                return 0
-        return user32.CallWindowProcW(ctypes.c_void_p(anterior), h, msg, wparam, lparam)
+class PathRejected(Exception):
+    """La ruta pedida por un documento no se puede atender.
 
-    callback = _WNDPROC(proc)
-    _wndprocs[hwnd] = (callback, anterior)
-    user32.SetWindowLongPtrW(hwnd, -4, ctypes.cast(callback, ctypes.c_void_p))
+    `reason` vale "red" si apunta fuera del equipo, o "fuera" si es local pero
+    queda por fuera de la carpeta del documento.
+    """
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
+
+
+def is_network_path(path: Path) -> bool:
+    """Decidir si una ruta sale del equipo.
+
+    Una ruta UNC hace que Windows negocie autenticación con el servidor, así
+    que un documento que pida `\\\\servidor\\recurso\\x.png` consigue que se
+    entregue el hash de la sesión sin que el usuario toque nada. Las unidades
+    de red asignadas a una letra llevan al mismo sitio por otro camino.
+    """
+    texto = str(path)
+    if texto.startswith(("\\\\", "//")):
+        return True
+    unidad = os.path.splitdrive(texto)[0]
+    if not unidad or not unidad.endswith(":"):
+        return False
+    try:
+        return ctypes.windll.kernel32.GetDriveTypeW(unidad + "\\") == 4  # DRIVE_REMOTE
+    except Exception:
+        return False
+
+
+def safe_media_path(src: str, doc_path: Path | None, *, contain: bool,
+                    trusted: list[str] | None = None) -> Path:
+    """Resolver una ruta pedida por el documento, o rechazarla.
+
+    El documento controla `src` por completo, así que la comprobación se hace
+    sobre la ruta **canónica**: `resolve()` deshace `..`, rutas cortas 8.3,
+    enlaces simbólicos y puntos de reanálisis, de modo que lo que se valida es
+    el archivo que realmente se va a abrir y no el texto que lo nombraba.
+    """
+    limpio = unquote(src.split("?")[0].split("#")[0]).strip()
+    if not limpio:
+        raise PathRejected("fuera")
+    # Las rutas de dispositivo saltean la normalización del propio Windows.
+    if limpio.startswith(("\\\\?\\", "\\\\.\\")):
+        raise PathRejected("red")
+    path = Path(limpio)
+    if not path.is_absolute() and doc_path:
+        path = doc_path.parent / path
+    try:
+        path = path.resolve()
+    except OSError as e:
+        raise PathRejected("fuera") from e
+    if is_network_path(path):
+        raise PathRejected("red")
+    # Un flujo alternativo de NTFS entrega otro contenido bajo el mismo nombre.
+    if ":" in path.name:
+        raise PathRejected("fuera")
+    if not contain or not doc_path:
+        return path
+    permitidas = [doc_path.parent.resolve()]
+    for d in trusted or []:
+        try:
+            permitidas.append(Path(d).resolve())
+        except OSError:
+            continue
+    for raiz in permitidas:
+        if path == raiz or raiz in path.parents:
+            return path
+    raise PathRejected("fuera")
 
 
 def window_under_cursor() -> int:
@@ -390,7 +452,7 @@ class WindowApi:
         if self._window and not self._shown:
             self._shown = True
             restore_resize_border(self.hwnd())
-            clamp_maximize_to_work_area(self.hwnd())
+            clamp_maximize_to_work_area(self._window)
             self._window.show()
         flush_pending_paths()
 
@@ -454,6 +516,9 @@ class WindowApi:
             return False
         self._maximized = not self._maximized
         if self._maximized:
+            # Recalcular por si la ventana cambió de monitor: MaximizedBounds
+            # guarda un rectángulo concreto, no "el monitor de turno".
+            clamp_maximize_to_work_area(self._window)
             self._window.maximize()
         else:
             self._window.restore()
@@ -590,17 +655,28 @@ class WindowApi:
         doc.encoding = "utf-8"
         return raw.decode("utf-8", "replace")
 
-    def open_into(self, doc_id: str, path: str) -> dict:
+    def open_into(self, doc_id: str, path: str, from_document: bool = False) -> dict:
         """Cargar `path` en la pestaña `doc_id`, reutilizándola si ya existe.
 
         Las rutas relativas se resuelven contra el archivo actual de esa
         pestaña, para que los enlaces entre documentos funcionen.
         """
         doc = self._docs.get(doc_id) or Doc(id=doc_id)
-        p = Path(unquote(path))
-        if not p.is_absolute() and doc.path:
-            p = doc.path.parent / p
-        p = p.resolve()
+        # Solo se filtran las rutas que propone el propio documento: un enlace
+        # a \\servidor\recurso entrega credenciales de red al hacer clic. Un
+        # archivo que el usuario eligió a mano se abre esté donde esté, aunque
+        # sea una unidad de red suya.
+        if from_document:
+            try:
+                p = safe_media_path(path, doc.path, contain=False)
+            except PathRejected:
+                return {"ok": False,
+                        "error": "El enlace apunta fuera del equipo y no se abrió."}
+        else:
+            p = Path(unquote(path))
+            if not p.is_absolute() and doc.path:
+                p = doc.path.parent / p
+            p = p.resolve()
         try:
             raw = p.read_bytes()
         except OSError as e:
@@ -666,6 +742,13 @@ class WindowApi:
             Path(tmp).unlink(missing_ok=True)
             raise
 
+    def pick_folder(self) -> str:
+        """Elegir una carpeta de confianza desde la configuración avanzada."""
+        res = self._window.create_file_dialog(webview.FOLDER_DIALOG)
+        if not res:
+            return ""
+        return str(res if isinstance(res, str) else res[0])
+
     def open_dialog(self) -> list:
         """Mostrar el selector de archivos y devolver las rutas elegidas, sin cargarlas."""
         start = str(Path.home())
@@ -689,29 +772,36 @@ class WindowApi:
         except OSError:
             return False
 
-    def image_data(self, doc_id: str, src: str) -> str:
+    def image_data(self, doc_id: str, src: str, override: bool = False) -> dict:
         """Devolver una imagen local del documento como data URI.
 
         La interfaz corre sobre http://127.0.0.1, origen desde el cual Chromium
         rechaza los subrecursos file://. Solo se atienden extensiones de imagen.
+
+        `override` levanta la contención para una imagen concreta que el
+        usuario pidió cargar; nunca levanta el bloqueo de rutas de red.
         """
         doc = self._docs.get(doc_id)
         if not doc or not doc.path:
-            return ""
+            return {"ok": False, "reason": "fuera"}
+        s = self._app.settings
+        contain = bool(s.get("contain_images", True)) and not override
         try:
-            path = Path(unquote(src.split("?")[0].split("#")[0]))
-            if not path.is_absolute():
-                path = doc.path.parent / path
-            path = path.resolve()
+            path = safe_media_path(src, doc.path, contain=contain,
+                                   trusted=s.get("trusted_dirs") or [])
+        except PathRejected as e:
+            return {"ok": False, "reason": e.reason}
+        try:
             if path.suffix.lower() not in IMAGE_TYPES:
-                return ""
+                return {"ok": False, "reason": "tipo"}
             if path.stat().st_size > MAX_IMAGE_BYTES:
-                return ""
+                return {"ok": False, "reason": "tamaño"}
             raw = path.read_bytes()
         except (OSError, ValueError):
-            return ""
+            return {"ok": False, "reason": "falta"}
         mime = IMAGE_TYPES[path.suffix.lower()]
-        return f"data:{mime};base64,{base64.b64encode(raw).decode('ascii')}"
+        return {"ok": True,
+                "uri": f"data:{mime};base64,{base64.b64encode(raw).decode('ascii')}"}
 
     def export_html(self, doc_id: str, body: str, title: str) -> dict:
         doc = self._docs.get(doc_id)

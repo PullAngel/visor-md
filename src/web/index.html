@@ -3,6 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  Segunda barrera, por debajo de DOMPurify: si alguna vez pasara HTML activo,
+  el navegador se niega igual a ejecutarlo o a salir a la red. Cubre además lo
+  que la sanitización no mira, como un @import dentro del <style> que genera
+  Mermaid. 'unsafe-inline' aparece solo en los estilos, porque KaTeX y Mermaid
+  colocan estilo en línea; los scripts no lo reciben, que es donde importa.
+-->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'none';
+  script-src 'self';
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: https:;
+  font-src 'self';
+  connect-src 'self';
+  object-src 'none';
+  frame-src 'none';
+  base-uri 'none';
+  form-action 'none';">
 <title>Visor MD</title>
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="vendor/katex.min.css">
@@ -116,7 +134,7 @@
   <button data-act="tomd" hidden>Convertir a .md</button>
   <hr>
   <button data-act="copyall">Copiar todo el Markdown</button>
-  <button data-act="images">Cargar imágenes remotas</button>
+  <button data-act="images">Cargar imágenes bloqueadas</button>
   <button data-act="export">Exportar a HTML…</button>
   <button data-act="print">Imprimir o guardar en PDF<kbd>Ctrl+P</kbd></button>
   <button data-act="reveal">Abrir carpeta contenedora</button>
@@ -136,6 +154,7 @@
   <div class="menu-label">Recientes</div>
   <div id="recent-list"></div>
   <hr>
+  <button data-act="advanced">Configuración avanzada…</button>
   <button data-act="install">Instalar en este equipo…</button>
   <button data-act="defaults">Aplicaciones predeterminadas de Windows</button>
   <button data-act="about">Acerca de Visor MD</button>
