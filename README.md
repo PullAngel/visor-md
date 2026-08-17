@@ -89,6 +89,7 @@ comprada: hacer clic en **Más información** → **Ejecutar de todas formas**.
 | `Ctrl+Shift+O` | Índice lateral |
 | `Ctrl+D` | Tema nocturno o diurno |
 | `Ctrl+P` | Imprimir o guardar en PDF |
+| `F11` | Pantalla completa sin bordes |
 | `Ctrl++` / `Ctrl+-` | Tamaño de texto |
 | `Ctrl+B` `Ctrl+I` `Ctrl+K` | Negrita, cursiva, enlace |
 | `Ctrl+1` a `Ctrl+3` | Títulos H1 a H3 |
@@ -113,6 +114,8 @@ igual que en GitHub.
 - **Buscar y reemplazar**, en lectura y en edición.
 - **Índice lateral** generado a partir de los encabezados del documento.
 - **Tipografía del documento** ajustable entre sistema, serif y monoespaciada.
+- Los archivos **abren siempre en lectura**; solo van directo a edición los
+  que no tienen nada que leer: una pestaña en blanco y los `.txt`.
 - Al pasar de lectura a edición se **conserva el punto del documento** donde
   se estaba leyendo, con el cursor ya puesto ahí.
 - Las pestañas sin guardar **toman su nombre del contenido** —el primer
@@ -185,9 +188,16 @@ mismo estilo de la app, no el cuadro nativo de Windows.
 La ventana no usa el marco de Windows: las pestañas ocupan la misma fila que
 los botones de minimizar, maximizar y cerrar, sin la franja gris que quedaría
 encima. Quitar el marco también quita los bordes de redimensionado y el
-acople de ventanas, así que el estilo `WS_THICKFRAME` se vuelve a aplicar
-sobre la ventana ya creada: se recupera el arrastre desde los bordes y Aero
-Snap, pero sin barra de título nativa.
+acople de ventanas, y el maximizado pasa a tapar la barra de tareas. Cada
+pieza se repone a mano; el detalle está en
+[`docs/ventana-sin-marco.md`](docs/ventana-sin-marco.md).
+
+El estilo `WS_THICKFRAME` se vuelve a aplicar sobre la ventana ya creada,
+que recupera el arrastre desde los bordes y Aero Snap sin barra de título
+nativa, y el mensaje `WM_GETMINMAXINFO` se intercepta para que el tamaño
+maximizado sea el área libre del monitor. La pantalla completa sin bordes,
+que sí tapa la barra de tareas, queda como un modo aparte en el menú `···`
+y en `F11`.
 
 ### Manejo de archivos
 

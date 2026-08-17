@@ -6,6 +6,7 @@ Falla ruidosamente si el documento no se renderiza como corresponde.
 """
 
 import json
+import re
 import sys
 import tempfile
 import threading
@@ -439,6 +440,24 @@ def check_menu_contextual(w):
     w.evaluate_js("document.getElementById('ctxmenu').hidden = true")
 
 
+def check_botones_de_ventana():
+    """Los botones de la barra propia existen del lado de Python.
+
+    El botón de cerrar estuvo llamando a un método inexistente: la interfaz
+    descartaba el error y la ventana no se cerraba nunca.
+    """
+    api = new_api(None)
+    for nombre in ("close_window", "minimize_window", "toggle_maximize",
+                   "toggle_fullscreen"):
+        check(f"la interfaz puede llamar a {nombre}",
+              callable(getattr(api, nombre, None)))
+    # Lo que la interfaz invoca de verdad, leído del propio JavaScript.
+    js = (ROOT / "src" / "web" / "app.js").read_text(encoding="utf-8")
+    llamadas = set(re.findall(r"call\(\s*'([a-z_]+)'", js))
+    faltan = sorted(n for n in llamadas if not callable(getattr(api, n, None)))
+    check("todas las llamadas del JavaScript existen en Python", not faltan, faltan)
+
+
 def check_interfaz():
     """Desbordamiento de la barra de pestañas y su selector."""
     api = new_api(str(ROOT / "tests" / "muestra.md"))
@@ -486,6 +505,10 @@ def check_scroll_y_borrador(w):
     wait_until(w, "document.getElementById('preview').scrollHeight >"
                   " document.getElementById('preview').clientHeight", 10)
 
+    # Un archivo abre en lectura aunque aterrice sobre una pestaña en blanco,
+    # que por estar vacía estaba en edición.
+    check("un archivo abre en modo lectura",
+          w.evaluate_js("document.getElementById('switch').dataset.mode") == "read")
     antes = w.evaluate_js("""(() => {
       const p = document.getElementById('preview');
       p.scrollTop = (p.scrollHeight - p.clientHeight) * 0.5;
@@ -607,6 +630,7 @@ def run_checks(window):
         check_menu_contextual(window)
 
         print("\n--- Barra de pestañas ---")
+        check_botones_de_ventana()
         check_interfaz()
 
         print("\n--- Scroll entre modos y borradores ---")

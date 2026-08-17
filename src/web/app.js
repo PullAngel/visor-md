@@ -157,16 +157,25 @@
     if (immediate) run(); else renderTimer = setTimeout(run, 180);
   }
 
+  /** Modo con el que se presenta una pestaña recién cargada.
+
+      Un archivo se abre siempre en lectura, sin recordar el modo anterior.
+      Van directo a edición los que no tienen nada que leer: un borrador en
+      blanco y los .txt, que son texto plano. */
+  function initialMode(tab) {
+    return tab.plain || (!tab.path && !tab.text) ? 'edit' : 'read';
+  }
+
   /** Crear el estado local de una pestaña; no la muestra ni la activa. */
   function makeTab(doc) {
     const tab = {
       id: doc.id, path: doc.path || null, name: doc.name, ext: doc.ext || '.md',
       text: doc.text || '', dirty: !!doc.dirty,
-      mode: settings.defaultMode || 'read', split: settings.defaultSplit || false,
+      mode: 'read', split: settings.defaultSplit || false,
       plain: false, remoteImages: false, scrollTop: 0,
     };
     tab.plain = !isMarkdown(tab);
-    if (tab.plain) tab.mode = 'edit';
+    tab.mode = initialMode(tab);
     return tab;
   }
 
@@ -234,7 +243,10 @@
       path: res.path, name: res.name, ext: res.ext || tab.ext, text: res.text || '',
     });
     tab.plain = !isMarkdown(tab);
-    if (tab.plain) tab.mode = 'edit';
+    // El modo se recalcula acá y no solo al crear la pestaña: abrir un archivo
+    // desde el Explorador lo carga sobre una pestaña en blanco, que estaba en
+    // edición justamente por estar vacía.
+    tab.mode = initialMode(tab);
     tab.dirty = false;
     if (tab.id === activeId) {
       setEditorText(tab.text);
@@ -293,7 +305,9 @@
     if (!edit) rerender(true);
     if (edit) editor.focus();
     if (persistPref) {
-      settings.defaultMode = tab.mode;
+      // El modo no se recuerda a propósito: un archivo se abre siempre en
+      // lectura. Solo se guarda la preferencia de vista dividida, que aplica
+      // cuando el usuario entra a edición.
       settings.defaultSplit = tab.split;
       persist();
     }
@@ -381,7 +395,7 @@
     clearTimeout(persistTimer);
     persistTimer = setTimeout(() => {
       call('save_settings', {
-        theme: settings.theme, mode: settings.defaultMode, split: settings.defaultSplit,
+        theme: settings.theme, split: settings.defaultSplit,
         toc: settings.toc, font_size: settings.fontSize, face: settings.face,
       }).catch(() => {});
     }, 400);
@@ -749,9 +763,21 @@
   async function toggleMaximize() {
     const max = await call('toggle_maximize').catch(() => null);
     if (max === null) return;
-    document.body.classList.toggle('maximizada', max);
+    marcarSinBordes(max);
+  }
+
+  async function toggleFullscreen() {
+    const on = await call('toggle_fullscreen').catch(() => null);
+    if (on === null) return;
+    marcarSinBordes(on);
+  }
+
+  // El borde de un pixel del cuerpo solo tiene sentido con la ventana suelta:
+  // pegada a los lados de la pantalla se vería como una línea de más.
+  function marcarSinBordes(activo) {
+    document.body.classList.toggle('maximizada', activo);
     $('win-max').firstElementChild.firstElementChild
-      .setAttribute('href', max ? '#i-restore' : '#i-max');
+      .setAttribute('href', activo ? '#i-restore' : '#i-max');
   }
 
   // Arrastrar la ventana desde el hueco libre de la barra.
@@ -878,6 +904,7 @@
       setTimeout(() => window.print(), 120);
     },
     reveal: () => { const t = active(); if (t) call('reveal', t.id).catch(() => {}); },
+    fullscreen: toggleFullscreen,
     'font+': () => setFontSize(settings.fontSize + 1),
     'font-': () => setFontSize(settings.fontSize - 1),
     defaults: () => call('open_default_apps').catch(() => {}),
@@ -1118,6 +1145,7 @@
       else if (!$('dialog').hidden) $('dlg-cancel').click();
       return;
     }
+    if (e.key === 'F11') { e.preventDefault(); toggleFullscreen(); return; }
     if (!ctrl) return;
     const k = e.key.toLowerCase();
     const tab = active();
@@ -1224,7 +1252,6 @@
     const info = await api.startup();
     const s = info.settings || {};
     settings.ready = false;
-    settings.defaultMode = s.mode === 'edit' ? 'edit' : 'read';
     settings.defaultSplit = !!s.split;
     setTheme(s.theme === 'light' ? 'light' : 'dark');
     setFontSize(parseInt(s.font_size, 10) || 16);

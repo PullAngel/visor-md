@@ -143,6 +143,85 @@ def restore_resize_border(hwnd: int) -> None:
     user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0x0020 | 0x0002 | 0x0001 | 0x0004)
 
 
+class _POINT(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+
+
+class _RECT(ctypes.Structure):
+    _fields_ = [("left", ctypes.c_long), ("top", ctypes.c_long),
+                ("right", ctypes.c_long), ("bottom", ctypes.c_long)]
+
+
+class _MINMAXINFO(ctypes.Structure):
+    _fields_ = [("ptReserved", _POINT), ("ptMaxSize", _POINT),
+                ("ptMaxPosition", _POINT), ("ptMinTrackSize", _POINT),
+                ("ptMaxTrackSize", _POINT)]
+
+
+class _MONITORINFO(ctypes.Structure):
+    _fields_ = [("cbSize", ctypes.c_ulong), ("rcMonitor", _RECT),
+                ("rcWork", _RECT), ("dwFlags", ctypes.c_ulong)]
+
+
+_WNDPROC = ctypes.WINFUNCTYPE(ctypes.c_longlong, ctypes.c_void_p, ctypes.c_uint,
+                              ctypes.c_void_p, ctypes.c_void_p)
+# Los procedimientos instalados se guardan para que el recolector de basura no
+# se lleve el puntero que Windows todavía tiene registrado.
+_wndprocs: dict[int, tuple] = {}
+
+
+def monitor_work_area(hwnd: int) -> tuple[_RECT, _RECT] | None:
+    """Área del monitor de la ventana: la completa y la libre de barras."""
+    user32 = ctypes.windll.user32
+    monitor = user32.MonitorFromWindow(ctypes.c_void_p(hwnd), 2)  # NEAREST
+    if not monitor:
+        return None
+    info = _MONITORINFO()
+    info.cbSize = ctypes.sizeof(_MONITORINFO)
+    if not user32.GetMonitorInfoW(ctypes.c_void_p(monitor), ctypes.byref(info)):
+        return None
+    return info.rcMonitor, info.rcWork
+
+
+def clamp_maximize_to_work_area(hwnd: int) -> None:
+    """Impedir que la ventana maximizada tape la barra de tareas.
+
+    Una ventana sin marco maximizada ocupa el monitor entero, porque Windows
+    calcula ese tamaño a partir de un borde que aquí no existe. Interceptar
+    WM_GETMINMAXINFO corrige el cálculo para todas las vías de maximizar: el
+    botón propio, Win+Flecha arriba y el acople al borde superior.
+    """
+    if not hwnd or hwnd in _wndprocs:
+        return
+    user32 = ctypes.windll.user32
+    user32.SetWindowLongPtrW.restype = ctypes.c_longlong
+    user32.GetWindowLongPtrW.restype = ctypes.c_longlong
+    user32.CallWindowProcW.restype = ctypes.c_longlong
+
+    anterior = user32.GetWindowLongPtrW(hwnd, -4)  # GWL_WNDPROC
+
+    def proc(h, msg, wparam, lparam):
+        if msg == 0x0024 and lparam:  # WM_GETMINMAXINFO
+            areas = monitor_work_area(hwnd)
+            if areas:
+                pantalla, libre = areas
+                mmi = ctypes.cast(lparam, ctypes.POINTER(_MINMAXINFO)).contents
+                mmi.ptMaxPosition.x = libre.left - pantalla.left
+                mmi.ptMaxPosition.y = libre.top - pantalla.top
+                mmi.ptMaxSize.x = libre.right - libre.left
+                mmi.ptMaxSize.y = libre.bottom - libre.top
+                # Sin este par, el usuario no puede agrandar a mano más allá
+                # del tamaño maximizado.
+                mmi.ptMaxTrackSize.x = pantalla.right - pantalla.left
+                mmi.ptMaxTrackSize.y = pantalla.bottom - pantalla.top
+                return 0
+        return user32.CallWindowProcW(ctypes.c_void_p(anterior), h, msg, wparam, lparam)
+
+    callback = _WNDPROC(proc)
+    _wndprocs[hwnd] = (callback, anterior)
+    user32.SetWindowLongPtrW(hwnd, -4, ctypes.cast(callback, ctypes.c_void_p))
+
+
 def window_under_cursor() -> int:
     """Handle de la ventana de nivel superior que está bajo el puntero."""
     x, y = cursor_position()
@@ -246,6 +325,8 @@ class WindowApi:
         self._shown = False
         self._force_close = False
         self._maximized = False
+        self._fullscreen = False
+        self._rect_previo: tuple[int, int, int, int] | None = None
 
     def attach(self, window) -> None:
         self._window = window
@@ -309,6 +390,7 @@ class WindowApi:
         if self._window and not self._shown:
             self._shown = True
             restore_resize_border(self.hwnd())
+            clamp_maximize_to_work_area(self.hwnd())
             self._window.show()
         flush_pending_paths()
 
@@ -355,8 +437,21 @@ class WindowApi:
     def minimize_window(self) -> None:
         self._window.minimize()
 
+    def close_window(self) -> None:
+        """Cerrar la ventana desde el botón de la barra propia.
+
+        Pasa por destroy() y no por force_close() para que el aviso de
+        cambios sin guardar siga saliendo: destroy() dispara el evento
+        closing, que es donde se decide si el cierre sigue adelante.
+        """
+        if self._window:
+            self._window.destroy()
+
     def toggle_maximize(self) -> bool:
         """Alternar maximizado. Devuelve el estado nuevo para el icono."""
+        if self._fullscreen:
+            self.toggle_fullscreen()
+            return False
         self._maximized = not self._maximized
         if self._maximized:
             self._window.maximize()
@@ -364,12 +459,50 @@ class WindowApi:
             self._window.restore()
         return self._maximized
 
+    def toggle_fullscreen(self) -> bool:
+        """Alternar pantalla completa sin bordes, tapando la barra de tareas.
+
+        No usa el maximizado de Windows, que ahora respeta el área libre del
+        monitor: coloca la ventana sobre el rectángulo completo de la pantalla
+        y guarda la posición anterior para volver a ella.
+        """
+        hwnd = self.hwnd()
+        if not hwnd:
+            return self._fullscreen
+        user32 = ctypes.windll.user32
+        if self._fullscreen:
+            self._fullscreen = False
+            rect = self._rect_previo
+            if rect:
+                user32.SetWindowPos(hwnd, 0, rect[0], rect[1],
+                                    rect[2] - rect[0], rect[3] - rect[1], 0x0004)
+            if self._maximized:
+                self._window.maximize()
+            return False
+        if self._maximized:
+            self._maximized = False
+            self._window.restore()
+        previo = (ctypes.c_long * 4)()
+        user32.GetWindowRect(hwnd, ctypes.byref(previo))
+        self._rect_previo = (previo[0], previo[1], previo[2], previo[3])
+        areas = monitor_work_area(hwnd)
+        if not areas:
+            return False
+        pantalla = areas[0]
+        self._fullscreen = True
+        user32.SetWindowPos(hwnd, 0, pantalla.left, pantalla.top,
+                            pantalla.right - pantalla.left,
+                            pantalla.bottom - pantalla.top, 0x0004)  # SWP_NOZORDER
+        return True
+
     def move_window(self, dx: int, dy: int) -> None:
         """Desplazar la ventana mientras se arrastra por la barra de pestañas."""
         hwnd = self.hwnd()
         if not hwnd:
             return
-        if self._maximized:  # Arrastrar una ventana maximizada la restaura.
+        if self._fullscreen:  # Arrastrar sale de pantalla completa.
+            self.toggle_fullscreen()
+        elif self._maximized:  # Arrastrar una ventana maximizada la restaura.
             self._maximized = False
             self._window.restore()
         rect = (ctypes.c_long * 4)()
