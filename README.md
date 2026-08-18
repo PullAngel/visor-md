@@ -6,7 +6,7 @@
 
 *[Read this in English](README.en.md)*
 
-Visor y editor de Markdown para Windows. Se fija como programa predeterminado
+Visor y editor ligero de Markdown para Windows. Se fija como programa predeterminado
 para los `.md`, abre al instante, funciona sin conexión, y trata el documento
 que abre como contenido ajeno: abrirlo no genera ni una petición a internet.
 
@@ -26,9 +26,11 @@ lo que hace falta para leer un archivo. Quería el equivalente a hacer doble cli
 en un PDF: que se abra algo liviano y el documento ya se vea.
 
 Después se sumó otra razón. Hoy muchos `.md` no los escribe uno: llegan de un
-repositorio ajeno, de un conversor de PDF o de una herramienta de IA. Un
-documento de origen desconocido no debería poder hacer nada raro solo por
-abrirlo, y eso terminó siendo la parte que más me ocupó.
+repositorio ajeno, de un conversor de PDF o de una herramienta de IA. Un documento de origen desconocido puede **contener HTML, enlaces, recursos
+externos y otro contenido que el visor tenga que interpretar**. Quería que
+abrirlo fuera una operación segura por defecto: que el documento pudiera verse
+tal como fue pensado, pero sin ganar acceso a nada que no le corresponda. Esa
+terminó siendo la parte que más me ocupó.
 
 ## Qué hace
 
@@ -154,7 +156,7 @@ todas formas**.
 
 ![Configuración avanzada](docs/screenshots/04-configuracion-avanzada.png)
 
-Las restricciones vienen puestas, pero se pueden aflojar.
+Las restricciones vienen puestas, pero se pueden editar desde Configuración avanzada.
 
 Los documentos de las capturas están en [`examples/`](examples).
 
@@ -238,9 +240,7 @@ powershell -ExecutionPolicy Bypass -File build\build.ps1
 
 El desarrollo fue asistido por IA, con las decisiones de arquitectura, seguridad
 y producto revisadas y verificadas a mano. Varios de los cambios de las últimas
-versiones salieron precisamente de esa verificación: el botón de cerrar que no
-respondía, el maximizado que agrandaba la ventana sin reajustar el contenido, y
-los diagramas que perdían sus rótulos al endurecer la sanitización.
+versiones salieron precisamente de esa verificación.
 
 ## Licencia
 
