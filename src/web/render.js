@@ -320,6 +320,12 @@ window.Render = (function () {
     mermaid.initialize({
       startOnLoad: false,
       securityLevel: 'strict',
+      // Las etiquetas se dibujan como texto SVG y no como HTML dentro de un
+      // foreignObject. Con esto el diagrama no necesita meter HTML dentro del
+      // SVG, que es justo lo que la segunda sanitización descarta: sin este
+      // ajuste los rótulos de los nodos desaparecían.
+      htmlLabels: false,
+      flowchart: { htmlLabels: false },
       theme: theme === 'dark' ? 'dark' : 'default',
       darkMode: theme === 'dark',
       fontFamily: 'Segoe UI, system-ui, sans-serif',

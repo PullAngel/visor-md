@@ -160,8 +160,14 @@ def check_mermaid(w):
         .map((el) => el.getAttribute('href') || el.getAttribute('src') || '')
         .filter((v) => /^(javascript|data:text\\/html|https?:)/i.test(v)),
       estilo: document.querySelectorAll('.mermaid-block style').length,
+      rotulos: [...document.querySelectorAll('.mermaid-block svg')]
+        .filter((s) => (s.textContent || '').replace(/\s/g, '').length > 3).length,
     })""")
     check("los diagramas válidos siguen dibujándose", r["svg"] >= 2, r["svg"])
+    # Un diagrama sin rótulos son cajas vacías: pasó de verdad al descartar
+    # foreignObject, y el SVG seguía estando ahí para disimularlo.
+    check("los diagramas conservan el texto de sus nodos",
+          r["rotulos"] >= 2, f'{r["rotulos"]} de {r["svg"]} con texto')
     check("el SVG del diagrama no trae script", r["script"] == 0, r["script"])
     check("el SVG del diagrama no trae foreignObject", r["foreign"] == 0, r["foreign"])
     check("el SVG del diagrama no trae atributos on*", not r["eventos"], r["eventos"][:4])

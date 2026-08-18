@@ -34,9 +34,9 @@ git checkout -b feature/exportar-pdf
 - [x] El diff no arrastra cambios de formato ajenos al ticket
 - [ ] La rama tiene menos de una semana de vida
 
-> Una rama que dura más de una semana casi siempre significa que el
-> ticket estaba mal cortado. Mejor partirlo en dos PRs chicos que revisar
-> uno enorme.
+> [!TIP]
+> Una rama que dura más de una semana casi siempre significa que el ticket
+> estaba mal cortado. Mejor partirlo en dos PRs chicos que revisar uno enorme.
 
 ## Comandos que usamos seguido
 

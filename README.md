@@ -1,80 +1,50 @@
 # Visor MD
 
-![Licencia](https://img.shields.io/badge/licencia-GPLv3-blue) ![Plataforma](https://img.shields.io/badge/plataforma-Windows%2010%20%2F%2011-0a7d0a)
+[![Versión](https://img.shields.io/github/v/release/PullAngel/visor-md?label=versi%C3%B3n&color=1C9E1C)](https://github.com/PullAngel/visor-md/releases/latest)
+[![Licencia](https://img.shields.io/badge/licencia-GPLv3-blue)](LICENSE)
+[![Plataforma](https://img.shields.io/badge/plataforma-Windows%2010%20%2F%2011-0a7d0a)](#instalación)
 
-Visor y editor de Markdown para Windows. Un único ejecutable de ~14 MB, sin
-conexión a internet, que se puede fijar como programa predeterminado para
-abrir archivos `.md` fuera de cualquier editor de código o IA. Cómodo para visualizar y editar archivos entregados por o para IA en el formato correcto y sin abrir programas pesados.
+*[Read this in English](README.en.md)*
 
-**[Descargar VisorMD-portable.zip](../../releases/latest/download/VisorMD-portable.zip)**
+Visor y editor de Markdown para Windows. Se fija como programa predeterminado
+para los `.md`, abre al instante, funciona sin conexión, y trata el documento
+que abre como contenido ajeno: abrirlo no genera ni una petición a internet.
 
-## Funciones:
+### ▶ [Descargar VisorMD-portable.zip](https://github.com/PullAngel/visor-md/releases/latest/download/VisorMD-portable.zip)
 
-- **Lectura**: el documento renderizado con formato completo — tablas,
-  listas de tareas, resaltado de sintaxis, diagramas y fórmulas — con botón
-  de copiar en cada bloque de código.
-- **Edición**: editor de texto plano con barra de ayudas de formato y
-  atajos de teclado, con vista dividida para ver el resultado en vivo.
-- **Pestañas y ventanas, como en un navegador**: abrir varios archivos a la
-  vez los agrega como pestañas de una misma ventana. Se arrastran para
-  reordenarlas, se sueltan fuera de la barra para abrirlas en una ventana
-  propia, o sobre otra ventana para moverlas ahí.
-- **Menú contextual** con clic derecho, distinto según dónde se haga: sobre
-  una pestaña, sobre el editor o sobre el documento renderizado.
-- **Exporta a PDF** (o a HTML) para compartir el documento renderizado fuera
-  de la app.
+Descomprimir y ejecutar. Sin instalador y sin dependencias. También en la
+[página de releases](https://github.com/PullAngel/visor-md/releases), con el
+hash del archivo y las versiones anteriores.
+
+![Visor MD en modo lectura, con pestañas y un diagrama Mermaid](docs/screenshots/01-lectura.png)
+
+## Por qué lo hice
+
+En Windows, un `.md` se abre en el Bloc de notas, que lo muestra como texto
+plano, o dentro de un editor de código, que tarda en arrancar y es mucho más de
+lo que hace falta para leer un archivo. Quería el equivalente a hacer doble clic
+en un PDF: que se abra algo liviano y el documento ya se vea.
+
+Después se sumó otra razón. Hoy muchos `.md` no los escribe uno: llegan de un
+repositorio ajeno, de un conversor de PDF o de una herramienta de IA. Un
+documento de origen desconocido no debería poder hacer nada raro solo por
+abrirlo, y eso terminó siendo la parte que más me ocupó.
+
+## Qué hace
+
+- **Lectura** con formato completo: tablas, listas de tareas, resaltado de
+  sintaxis, alertas de GitHub, diagramas Mermaid y fórmulas LaTeX, con botón de
+  copiar en cada bloque de código.
+- **Edición** de texto plano con barra de ayudas y atajos, y vista dividida para
+  ver el resultado en vivo mientras se escribe.
+- **Pestañas y ventanas como en un navegador**: se arrastran para reordenarlas,
+  se sueltan fuera para abrirlas aparte, o sobre otra ventana para moverlas ahí.
+  Abrir ocho archivos a la vez los deja como ocho pestañas de una sola ventana.
+- **Exporta a PDF** o a HTML, e imprime.
 - Abre también archivos `.txt`, con la opción de convertirlos a `.md`.
 
-## Capturas
-
-| | |
-| --- | --- |
-| ![Lectura en tema noche, con un diagrama Mermaid](docs/screenshots/01-lectura-oscuro-mermaid.png) | ![Botón Copiar confirmado en un bloque de código](docs/screenshots/02-copiar-codigo.png) |
-| Lectura en tema noche, con pestañas y un diagrama Mermaid | Botón **Copiar** confirmado en un bloque de código |
-| ![Lectura en tema día](docs/screenshots/03-lectura-claro.png) | ![Edición con vista dividida](docs/screenshots/04-edicion-dividida.png) |
-| Lectura en tema día | Edición con vista dividida |
-
-Los documentos de las capturas están en [`examples/`](examples).
-
-## Instalación
-
-### Uso portable (sin instalación)
-
-1. Descargar [`VisorMD-portable.zip`](../../releases/latest/download/VisorMD-portable.zip).
-2. Descomprimirlo en cualquier carpeta.
-3. Ejecutar `VisorMD.exe`. Se puede mover esa carpeta a un pendrive o a otra
-   PC sin perder nada: los ajustes se guardan aparte, en el perfil de
-   Windows del usuario.
-
-### Instalación en el equipo
-
-1. Descargar y descomprimir `VisorMD-portable.zip` (o usar la carpeta
-   `VisorMD` de un release ya descomprimido).
-2. Ejecutar `VisorMD.exe` una vez.
-3. En el menú `···` de la app, elegir **Instalar en este equipo**. Esto
-   copia la aplicación a `%LOCALAPPDATA%\Programs\VisorMD`, crea un acceso
-   directo en el menú Inicio y registra las extensiones `.md`, `.markdown`
-   y `.txt`. No pide permisos de administrador.
-4. Para desinstalarla más adelante: Configuración → Aplicaciones → Visor MD
-   → Desinstalar.
-
-### Ponerla como programa predeterminado
-
-Windows no deja que una aplicación se fije a sí misma como predeterminada:
-ese paso lo da siempre el usuario, y es el mismo para cualquier programa.
-
-1. Clic derecho sobre un archivo `.md`.
-2. **Abrir con** → **Elegir otra aplicación**.
-3. Seleccionar **Visor MD** y marcar **Usar siempre esta aplicación para
-   abrir archivos .md**.
-
-El primer arranque puede mostrar la advertencia de SmartScreen de Windows
-("Windows protegió su PC") porque el ejecutable no tiene una firma de código
-comprada: hacer clic en **Más información** → **Ejecutar de todas formas**.
-
-## Todas las funciones
-
-### Atajos de teclado
+<details>
+<summary><b>Atajos de teclado</b></summary>
 
 | Atajo | Acción |
 | --- | --- |
@@ -95,41 +65,98 @@ comprada: hacer clic en **Más información** → **Ejecutar de todas formas**.
 | `Ctrl+1` a `Ctrl+3` | Títulos H1 a H3 |
 | `Ctrl+Shift+` `X` `C` `T` `7` `8` `.` | Tachado, bloque de código, tarea, lista numerada, lista, cita |
 
-En edición, `Enter` continúa la lista actual y la renumera, `Tab` y
-`Shift+Tab` indentan la selección, y pegar una URL sobre texto seleccionado
-lo convierte en enlace.
+En edición, `Enter` continúa la lista actual y la renumera, `Tab` y `Shift+Tab`
+indentan la selección, y pegar una URL sobre texto seleccionado lo convierte en
+enlace.
+</details>
 
-### Formato de Markdown admitido
+<details>
+<summary><b>Formato admitido y funciones menores</b></summary>
 
-Listas anidadas y numeradas, tablas con alineación, bloques de código dentro
-de listas y citas, enlaces inline y de referencia, imágenes locales, HTML,
-`<details>`, casillas de verificación, encabezados ATX y setext, escapes,
-vallas de código de cuatro backticks y de `~~~`, notas al pie, autolinks,
-alertas de GitHub (`> [!NOTE]`, `TIP`, `IMPORTANT`, `WARNING`, `CAUTION`),
-fórmulas LaTeX (KaTeX), diagramas Mermaid y frontmatter YAML, que se oculta
-igual que en GitHub.
+Listas anidadas y numeradas, tablas con alineación, bloques de código dentro de
+listas y citas, enlaces inline y de referencia, imágenes locales, HTML,
+`<details>`, casillas de verificación, encabezados ATX y setext, escapes, vallas
+de cuatro backticks y de `~~~`, notas al pie, autolinks, alertas de GitHub
+(`> [!NOTE]`, `TIP`, `IMPORTANT`, `WARNING`, `CAUTION`), fórmulas LaTeX con
+KaTeX, diagramas Mermaid y frontmatter YAML, que se oculta igual que en GitHub.
 
-### Otras funciones
+- Menú contextual distinto según dónde se haga clic derecho: pestaña, editor o
+  documento renderizado.
+- Buscar y reemplazar, en lectura y en edición.
+- Índice lateral generado a partir de los encabezados.
+- Al pasar de lectura a edición se conserva el punto donde se estaba leyendo.
+- Las pestañas sin guardar toman su nombre del contenido.
+- Archivos recientes, tipografía ajustable y detección de cambios hechos por
+  otro programa mientras el documento está abierto.
+</details>
 
-- **Buscar y reemplazar**, en lectura y en edición.
-- **Índice lateral** generado a partir de los encabezados del documento.
-- **Tipografía del documento** ajustable entre sistema, serif y monoespaciada.
-- Los archivos **abren siempre en lectura**; solo van directo a edición los
-  que no tienen nada que leer: una pestaña en blanco y los `.txt`.
-- Al pasar de lectura a edición se **conserva el punto del documento** donde
-  se estaba leyendo, con el cursor ya puesto ahí.
-- Las pestañas sin guardar **toman su nombre del contenido** —el primer
-  título, o la primera línea de texto— y se distinguen en cursiva.
-- Con muchas pestañas abiertas, la barra se desplaza con la rueda del mouse
-  y un botón despliega la lista completa para saltar a cualquiera.
-- **Archivos recientes** y detección de cambios hechos por otro programa
-  mientras el documento está abierto.
-- **Imágenes bloqueadas por defecto** si no vinieron con el documento: las
-  remotas, para no filtrar la IP al abrir un archivo ajeno, y las locales que
-  estén fuera de su carpeta. Un clic en el menú las carga.
-- **Configuración avanzada** para aflojar esas restricciones y marcar carpetas
-  de confianza, cuyos documentos se abren sin límites de imágenes.
-- Tema **nocturno** y **diurno**, y tamaño de letra ajustable.
+## Seguridad
+
+Un `.md` es contenido ajeno. Puede traer HTML, y ese HTML puede hacer cosas que
+nadie espera de un documento de texto. La aplicación asume que el archivo es
+hostil hasta demostrar lo contrario, y de ahí salen cuatro propiedades:
+
+1. **Abrir un documento no genera ninguna petición a la red.** Ni por imagen,
+   `srcset`, SVG, CSS, medios incrustados, diagrama o fórmula. Una imagen remota
+   rastrea aunque no ejecute nada: confirma que abriste el archivo y entrega tu
+   IP. Se cargan si las pedís, no antes.
+2. **Nada del documento se ejecuta.** Todo el HTML pasa por DOMPurify con
+   allowlist explícita de protocolos, y una CSP respalda la sanitización por
+   debajo.
+3. **Un documento no puede leer archivos que no le corresponden.** Las rutas se
+   validan ya canonizadas, así que la comprobación cae sobre el archivo que se
+   va a abrir y no sobre el nombre que lo pedía. Las rutas de red se rechazan
+   siempre: resolver una `\\servidor\recurso` hace que Windows entregue
+   credenciales sin mediar un clic.
+4. **El documento no puede disfrazarse de la aplicación.** Queda contenido en su
+   área, y lo que copiás de un bloque de código es lo que ves.
+
+Las restricciones se pueden aflojar desde **Configuración avanzada**, con
+carpetas de confianza para el trabajo propio. Lo que no es configurable es la
+sanitización: se puede ampliar a qué recursos accede un documento, nunca qué
+puede ejecutar.
+
+Hay una suite dedicada, `tests/seguridad.py`, con su corpus de ataque en
+`tests/security/`. En su primera ejecución encontró tres caminos de red que yo
+había dado por cerrados —`srcset`, los SVG en línea y `background-image`— y los
+tres son hoy pruebas de regresión.
+
+El detalle completo está en
+[`docs/frontera-de-seguridad.md`](docs/frontera-de-seguridad.md).
+
+## Instalación
+
+**Portable**: descomprimir
+[`VisorMD-portable.zip`](https://github.com/PullAngel/visor-md/releases/latest/download/VisorMD-portable.zip)
+y ejecutar `VisorMD.exe`. La carpeta se puede mover a un pendrive o a otra PC;
+los ajustes se guardan aparte, en el perfil de Windows.
+
+**En el equipo**: ejecutarlo una vez y elegir **Instalar en este equipo** en el
+menú `···`. Copia la aplicación a `%LOCALAPPDATA%\Programs\VisorMD`, crea el
+acceso directo en el menú Inicio y registra `.md`, `.markdown` y `.txt`. No pide
+permisos de administrador, y se desinstala desde Configuración → Aplicaciones.
+
+**Como programa predeterminado**: Windows no deja que una aplicación se fije a
+sí misma, así que ese paso lo da siempre el usuario. Clic derecho en un `.md` →
+**Abrir con** → **Elegir otra aplicación** → **Visor MD**, marcando *Usar
+siempre esta aplicación*.
+
+El ejecutable no tiene firma de código comprada, así que el primer arranque
+puede mostrar la advertencia de SmartScreen: **Más información** → **Ejecutar de
+todas formas**.
+
+## Capturas
+
+| | |
+| --- | --- |
+| ![Edición con vista dividida](docs/screenshots/02-edicion-dividida.png) | ![Lectura en tema día](docs/screenshots/03-tema-dia.png) |
+| Edición con vista dividida y el resultado en vivo | El mismo documento en tema día |
+
+![Configuración avanzada](docs/screenshots/04-configuracion-avanzada.png)
+
+Las restricciones vienen puestas, pero se pueden aflojar.
+
+Los documentos de las capturas están en [`examples/`](examples).
 
 ---
 
@@ -141,137 +168,53 @@ igual que en GitHub.
 | --- | --- |
 | `src/main.py` | Ventanas, pestañas, puente con JavaScript, archivos y ajustes |
 | `src/winshell.py` | Instalación, registro de extensiones y desinstalación |
-| `src/web/index.html` | Estructura de la interfaz |
-| `src/web/styles.css` | Temas y estilos del documento |
 | `src/web/render.js` | Markdown a HTML, sanitización y post-proceso |
-| `src/web/editor.js` | Ayudas de escritura sobre el área de texto |
 | `src/web/app.js` | Estado, pestañas, atajos y llamadas a Python |
+| `src/web/editor.js` | Ayudas de escritura sobre el área de texto |
 | `src/web/vendor/` | markdown-it, highlight.js, KaTeX, Mermaid y DOMPurify |
 
-La interfaz corre sobre WebView2, el motor de Edge que Windows ya incluye,
-de modo que el ejecutable no empaqueta un navegador propio. Python se ocupa
-de la entrada y salida de archivos, los diálogos nativos y el registro de
-Windows; toda la lógica de render y edición vive en JavaScript.
+La interfaz corre sobre **WebView2**, el motor de Edge que Windows ya trae, de
+modo que el ejecutable no empaqueta un navegador propio: son 14 MB en vez de los
+150 de una aplicación Electron. Python se ocupa de los archivos, los diálogos
+nativos y el registro de Windows; el render y la edición viven en JavaScript, y
+entre los dos hay un puente de pywebview.
 
-El editor es un `<textarea>` nativo, no un componente de terceros: conserva
-el deshacer y rehacer del sistema operativo y evita una dependencia extra.
-Mermaid ocupa 3,5 MB de los 4,3 MB de librerías empaquetadas y se carga de
-forma diferida, solo cuando el documento contiene un diagrama.
+El editor es un `<textarea>` nativo y no un componente de terceros: conserva el
+deshacer del sistema operativo y evita una dependencia. Mermaid pesa 3,5 de los
+4,3 MB de librerías empaquetadas y se carga solo si el documento trae un
+diagrama.
 
-### Pestañas y ventanas
+### Decisiones que valió la pena cuidar
 
-Todas las ventanas de una misma sesión viven en un solo proceso: abrir una
-ventana nueva es instantáneo, comparten los ajustes en memoria y mover una
-pestaña de una ventana a otra no requiere comunicación entre procesos.
+**Archivos.** Se detectan UTF-8, UTF-8 con BOM, UTF-16 con BOM y cp1252, y se
+conservan al guardar junto con el BOM y el tipo de fin de línea, CRLF o LF: un
+archivo ajeno no debería cambiar de codificación por haberlo abierto. El
+guardado es atómico —archivo temporal y reemplazo— para no dejarlo a medio
+escribir ante un corte. Si el archivo cambia por fuera de la aplicación, al
+recuperar el foco se ofrece recargarlo.
 
-Cada pestaña es un documento independiente (`Doc` en `main.py`) con su ruta,
-codificación, fin de línea y estado de cambios sin guardar. La interfaz
-mantiene un único `<textarea>` y un único panel de vista previa: cambiar de
-pestaña vuelca el texto en memoria y vuelve a renderizar, en vez de sostener
-varios pares editor/vista ocultos.
-
-El arrastre de pestañas usa eventos de puntero en vez del arrastrar y
-soltar nativo de HTML5, que no ofrece control fino sobre soltar una pestaña
-fuera de la ventana o sobre otra ventana de la misma app. Al soltar, se
-identifica qué ventana propia hay bajo el cursor: si hay una, la pestaña se
-muda con su texto sin guardar; si no hay ninguna, se abre una ventana nueva
-en ese punto.
-
-Abrir un archivo con una ventana ya abierta lo agrega como pestaña nueva en
-esa ventana, en vez de abrir una segunda. Seleccionar ocho archivos en el
-Explorador y abrirlos de golpe lanza ocho procesos casi simultáneos: los que
-llegan antes de que la primera ventana termine de cargarse quedan en una cola
-y se vuelcan como pestañas en cuanto está lista.
-
-El aviso de cambios sin guardar al cerrar usa un diálogo propio con el
-mismo estilo de la app, no el cuadro nativo de Windows.
-
-### Barra de título propia
-
-La ventana no usa el marco de Windows: las pestañas ocupan la misma fila que
-los botones de minimizar, maximizar y cerrar, sin la franja gris que quedaría
-encima. Quitar el marco también quita los bordes de redimensionado y el
-acople de ventanas, y el maximizado pasa a tapar la barra de tareas. Cada
-pieza se repone a mano; el detalle está en
+**Ventana.** La barra de título es propia, para que las pestañas compartan fila
+con los botones de minimizar y cerrar. Quitar el marco nativo se lleva por
+delante el redimensionado por bordes, Aero Snap y el maximizado correcto, y cada
+pieza hay que reponerla a mano:
 [`docs/ventana-sin-marco.md`](docs/ventana-sin-marco.md).
 
-El estilo `WS_THICKFRAME` se vuelve a aplicar sobre la ventana ya creada,
-que recupera el arrastre desde los bordes y Aero Snap sin barra de título
-nativa, y el mensaje `WM_GETMINMAXINFO` se intercepta para que el tamaño
-maximizado sea el área libre del monitor. La pantalla completa sin bordes,
-que sí tapa la barra de tareas, queda como un modo aparte en el menú `···`
-y en `F11`.
-
-### Manejo de archivos
-
-- Codificaciones admitidas: UTF-8, UTF-8 con BOM, UTF-16 con BOM y cp1252.
-  La codificación original se detecta y se conserva al guardar.
-- Se preservan el BOM y el tipo de fin de línea, CRLF o LF.
-- El guardado es atómico: archivo temporal en la misma carpeta y reemplazo,
-  para no dejar el archivo a medio escribir ante un corte.
-- Si el archivo cambia por fuera de la aplicación, al recuperar el foco se
-  ofrece recargarlo.
-
-### Seguridad
-
-Un documento Markdown puede provenir de cualquier origen, así que se trata
-como contenido hostil hasta que se demuestre lo contrario. El detalle de cada
-frontera está en
-[`docs/frontera-de-seguridad.md`](docs/frontera-de-seguridad.md); en resumen:
-
-- Todo el HTML generado pasa por DOMPurify, con allowlist explícita de
-  protocolos: `http`, `https`, `mailto` y rutas relativas. `<style>`,
-  `<form>` y los elementos que piden un recurso externo por su cuenta se
-  descartan aparte.
-- Una CSP respalda la sanitización desde el navegador y cubre lo que esta no
-  mira, como un `@import` dentro de un `<style>` generado.
-- Las rutas que propone el documento se validan **canonizadas**, no como
-  texto, de modo que la comprobación recae sobre el archivo que se va a abrir
-  y no sobre el nombre que lo pedía. Las rutas de red se rechazan siempre:
-  resolver una UNC hace que Windows entregue credenciales sin mediar un clic.
-- Abrir un documento no genera ninguna petición remota, por ninguna vía:
-  imagen, `srcset`, SVG, CSS, medios incrustados, diagrama o fórmula.
-- El panel del documento usa `contain: paint`, de modo que un elemento
-  posicionado dentro del Markdown no puede cubrir la barra de herramientas,
-  y las referencias de la interfaz se fijan al arrancar para que un `id` del
-  documento no pueda suplantarlas.
-- Los bloques de código pierden los atributos `style` y `hidden`: lo que se
-  copia siempre coincide con lo que se ve.
-- El SVG que genera Mermaid vuelve a sanearse antes de entrar en la página,
-  porque era la única vía que no atravesaba la sanitización general. KaTeX
-  corre con `trust: false` y con tope de tamaño y de expansión de macros.
-- El frontmatter se descarta con una expresión regular: no hay ningún
-  analizador de YAML al que atacar.
-- El registro de Windows se modifica solo en `HKCU` y solo a pedido
-  explícito del usuario. Los procesos auxiliares se invocan por ruta
-  absoluta, no por nombre.
-
-Lo que se puede aflojar desde la configuración avanzada es **a qué recursos
-accede** un documento. Lo que nunca se puede aflojar es **qué puede
-ejecutar**.
+**Varias ventanas, un proceso.** Abrir una ventana nueva es instantáneo y mover
+una pestaña entre ventanas no necesita comunicación entre procesos: el documento
+viaja entero, con su codificación y sus cambios sin guardar.
 
 ### Pruebas
 
 Tres suites, sin frameworks de por medio:
 
-- `tests/test_files.py` — lectura y escritura en disco: codificaciones,
-  BOM, fin de línea, guardado atómico, detección de cambios externos y
-  movimiento de una pestaña entre ventanas.
-- `tests/smoke.py` — abre la aplicación real (no un mock) y verifica el
-  render contra `tests/estres.md`, un documento armado con casos límite de
-  Markdown. Cubre también pestañas, arrastre entre ventanas, menú
-  contextual y el diálogo de cierre.
-- `tests/seguridad.py` — abre el corpus hostil de `tests/security/` y afirma
-  propiedades, no ausencia de fallos: que no queda ningún atributo `on*`, que
-  no salió una sola petición a la red, que ninguna ruta escapó de la carpeta
-  del documento. Los payloads son datos de prueba: la suite mira en qué
-  quedaron convertidos, nunca los ejecuta.
-
-Encontró tres fallos reales durante su primera ejecución, entre ellos que
-`srcset`, los SVG en línea y `background-image` seguían saliendo a la red.
-
-El arrastre entre ventanas se verificó además moviendo el cursor del
-sistema operativo de verdad, no con eventos simulados.
+- `tests/test_files.py` — lectura y escritura en disco: codificaciones, BOM, fin
+  de línea, guardado atómico y cambios externos.
+- `tests/smoke.py` — abre la aplicación real, no un mock, y verifica el render
+  contra un documento de casos límite, además de pestañas, menú contextual y el
+  diálogo de cierre.
+- `tests/seguridad.py` — el corpus hostil de `tests/security/`. Afirma
+  propiedades concretas: que no queda ningún atributo `on*`, que no salió una
+  petición a la red, que ninguna ruta escapó de la carpeta del documento.
 
 ```powershell
 python tests\test_files.py
@@ -279,38 +222,25 @@ python tests\smoke.py
 python tests\seguridad.py
 ```
 
-### Paleta
-
-| Rol | Nocturno | Diurno |
-| --- | --- | --- |
-| Fondo | `#061401` | `#EBFADC` |
-| Superficies | `#0C2206` | `#F7FDEF` |
-| Texto | `#E3F6E7` | `#132A0A` |
-| Iconos y acento | `#1C9E1C` | `#1C9E1C` |
-| Acento sobre texto blanco | `#157815` | `#157815` |
+No hay GitHub Actions, y es a propósito: dos de las tres suites manejan una
+ventana real de WebView2, y una ventana que no se dibuja no tiene medidas. Un
+runner sin escritorio no puede correrlas. Un CI que ejecutara solo la suite de
+archivos pondría una insignia verde sobre un tercio de la cobertura, que
+comunica peor que no tener ninguna.
 
 ### Desarrollo
 
 ```powershell
 python -m pip install -r requirements.txt
 python src\main.py tests\muestra.md
-```
-
-Compilar el ejecutable (genera `dist\VisorMD\` y `dist\VisorMD-portable.zip`):
-
-```powershell
 powershell -ExecutionPolicy Bypass -File build\build.ps1
 ```
 
-Actualizar las librerías del navegador:
-
-```powershell
-cd build
-npm install markdown-it markdown-it-anchor markdown-it-footnote markdown-it-deflist markdown-it-task-lists "@highlightjs/cdn-assets" mermaid katex dompurify
-```
-
-Copiar los `dist/*.min.js` resultantes a `src/web/vendor/`. De las fuentes
-de KaTeX se conservan solo los `.woff2`.
+El desarrollo fue asistido por IA, con las decisiones de arquitectura, seguridad
+y producto revisadas y verificadas a mano. Varios de los cambios de las últimas
+versiones salieron precisamente de esa verificación: el botón de cerrar que no
+respondía, el maximizado que agrandaba la ventana sin reajustar el contenido, y
+los diagramas que perdían sus rótulos al endurecer la sanitización.
 
 ## Licencia
 
