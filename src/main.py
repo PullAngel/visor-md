@@ -411,6 +411,13 @@ class WindowApi:
     # Ciclo de vida de la ventana
 
     def _on_resized(self, width, height) -> None:
+        # Al minimizar (o durante un cierre de sesión de Windows) el evento de
+        # resize llega con un tamaño casi nulo, muy por debajo de min_size. Sin
+        # este filtro, esa medida se guardaba como si fuera el tamaño normal de
+        # la ventana, y el siguiente arranque creaba una ventana de unos pocos
+        # píxeles: invisible, aunque el proceso corriera bien.
+        if width < 560 or height < 420:
+            return
         self._size = (int(width), int(height))
 
     def _on_closing(self) -> bool:
