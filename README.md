@@ -26,7 +26,8 @@ lo que hace falta para leer un archivo. Quería el equivalente a hacer doble cli
 en un PDF: que se abra algo liviano y el documento ya se vea.
 
 Después se sumó otra razón. Hoy muchos `.md` no los escribe uno: llegan de un
-repositorio ajeno, de un conversor de PDF o de una herramienta de IA. Un documento de origen desconocido puede **contener HTML, enlaces, recursos
+repositorio ajeno, de un conversor de PDF o de una herramienta de IA. Un
+documento de origen desconocido puede **contener HTML, enlaces, recursos
 externos y otro contenido que el visor tenga que interpretar**. Quería que
 abrirlo fuera una operación segura por defecto: que el documento pudiera verse
 tal como fue pensado, pero sin ganar acceso a nada que no le corresponda. Esa
