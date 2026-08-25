@@ -56,11 +56,40 @@ window.Editor = (function () {
     replaceRange(s, e, pre + inner + post, s + pre.length, e + pre.length);
   }
 
-  /** Agregar un prefijo a las líneas seleccionadas, o quitarlo si ya lo tienen todas. */
+  /** Agregar un prefijo a las líneas seleccionadas, o quitarlo si ya lo tienen todas.
+
+      Con una selección parcial dentro de una sola línea, el prefijo se aplica
+      solo a lo seleccionado, que pasa a ser su propia línea. Sin selección se
+      trabaja sobre el párrafo entero donde está el cursor. */
   function prefixLines(make, test) {
+    const v = val();
+    const selStart = ta.selectionStart;
+    const selEnd = ta.selectionEnd;
     const { start, end, text } = lineBounds();
+
+    if (selStart !== selEnd && !text.includes('\n')
+        && (selStart > start || selEnd < end)) {
+      const sangria = text.match(/^(\s*)/)[0];
+      const antes = v.slice(start, selStart).replace(/\s+$/, '');
+      const sel = v.slice(selStart, selEnd).trim();
+      const despues = v.slice(selEnd, end).replace(/^\s+/, '');
+      const nueva = sangria + make(sel, 0);
+      const piezas = [];
+      if (antes.trim()) piezas.push(antes);
+      piezas.push(nueva);
+      if (despues.trim()) piezas.push(despues);
+      const unido = piezas.join('\n');
+      const desde = start + (antes.trim() ? antes.length + 1 : 0);
+      replaceRange(start, end, unido, desde, desde + nueva.length);
+      return;
+    }
+
     const lines = text.split('\n');
-    const allHave = lines.every((l) => l.trim() === '' || test(l));
+    // Una línea en blanco no cuenta como que "ya tiene" el prefijo: si todo lo
+    // seleccionado está vacío hay que ponerlo, no quitarlo. Sin esto, pulsar el
+    // botón sobre una línea nueva no iniciaba la lista.
+    const conTexto = lines.filter((l) => l.trim() !== '');
+    const allHave = conTexto.length > 0 && conTexto.every(test);
     const out = lines.map((l, i) => {
       if (allHave) return l.replace(/^(\s*)(?:[-*+]\s\[[ xX]\]\s|[-*+]\s|\d+[.)]\s|#{1,6}\s|>\s?)/, '$1');
       if (l.trim() === '' && lines.length > 1) return l;

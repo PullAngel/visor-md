@@ -66,6 +66,12 @@ EDIT_CHECKS = """(() => {
   out.quote = run('una cita', [0, 0], 'quote');
   out.ol = run('uno\\ndos\\ntres', [0, 12], 'ol');
   out.link = run('Anthropic', [0, 9], 'link');
+  // Lista numerada sobre una línea nueva: debe iniciar la numeración.
+  out.olVacia = run('', [0, 0], 'ol');
+  // Con selección parcial, el prefijo va solo a lo seleccionado.
+  out.olParcial = run('hola mundo cruel', [5, 10], 'ol');
+  // Sin selección, sigue tomando el párrafo entero.
+  out.olParrafo = run('hola mundo cruel', [7, 7], 'ol');
   out.enterList = (() => {
     ta.value = ''; ta.focus();
     document.execCommand('insertText', false, '- primero');
@@ -90,6 +96,9 @@ EXPECTED_EDIT = {
     "quote": "> una cita",
     "ol": "1. uno\n2. dos\n3. tres",
     "link": "[Anthropic](url)",
+    "olVacia": "1. ",
+    "olParcial": "hola\n1. mundo\ncruel",
+    "olParrafo": "1. hola mundo cruel",
     "enterList": "- primero\n- ",
     "exitList": '""',
 }

@@ -592,7 +592,10 @@
     if (tab.mode === 'edit' && (tab.split || tab.plain)) rerender(false);
   }
 
-  editor.addEventListener('input', onInput);
+  editor.addEventListener('input', () => {
+    if (splitActivo()) setDriver(editor);
+    onInput();
+  });
   Editor.init(editor, () => {});
 
   let syncing = false;
@@ -604,14 +607,36 @@
     to.scrollTop = ratio * (to.scrollHeight - to.clientHeight);
     requestAnimationFrame(() => { syncing = false; });
   }
-  editor.addEventListener('scroll', () => {
+
+  // Cuál de los dos paneles manda el scroll en vista dividida. Al escribir,
+  // volver a renderizar reemplaza el HTML de la vista previa y eso dispara su
+  // evento de scroll con una posición que ya no corresponde; sin este mando,
+  // ese eco arrastraba el editor y el texto que se estaba escribiendo se iba
+  // de pantalla.
+  let driver = null;
+  let driverTimer = null;
+  function setDriver(el) {
+    driver = el;
+    clearTimeout(driverTimer);
+    driverTimer = setTimeout(() => { driver = null; }, 260);
+  }
+
+  const splitActivo = () => {
     const tab = active();
-    if (tab && tab.split && tab.mode === 'edit') syncScroll(editor, preview);
+    return !!(tab && tab.split && tab.mode === 'edit');
+  };
+
+  editor.addEventListener('scroll', () => {
+    if (!splitActivo()) return;
+    if (driver && driver !== editor) return;
+    setDriver(editor);
+    syncScroll(editor, preview);
   });
   preview.addEventListener('scroll', () => {
-    const tab = active();
-    if (tab && tab.split && tab.mode === 'edit') syncScroll(preview, editor);
-    else spyToc();
+    if (!splitActivo()) { spyToc(); return; }
+    if (driver && driver !== preview) return;
+    setDriver(preview);
+    syncScroll(preview, editor);
   });
 
   $('mode-read').addEventListener('click', () => setMode('read'));

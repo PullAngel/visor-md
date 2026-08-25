@@ -30,8 +30,8 @@ git checkout -b feature/exportar-pdf
 
 ## Antes de abrir el pull request
 
-- [x] Los tests pasan localmente
-- [x] El diff no arrastra cambios de formato ajenos al ticket
+- [ ] Los tests pasan localmente
+- [ ] El diff no arrastra cambios de formato ajenos al ticket
 - [ ] La rama tiene menos de una semana de vida
 
 > [!TIP]
